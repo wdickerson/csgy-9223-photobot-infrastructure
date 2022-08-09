@@ -1,0 +1,1182 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: ""
+Outputs:
+    ApiHost:
+        Value: !Sub "https://${ApiGatewayRestApi}.execute-api.${AWS::Region}.amazonaws.com/${ApiGatewayStage}"
+    FrontendUrl:
+        Value: !GetAtt
+            - S3BucketFrontend
+            - WebsiteURL
+Resources:
+    # API Gateway Resources
+    #############################
+    ApiGatewayRestApi:
+        Type: "AWS::ApiGateway::RestApi"
+        Properties:
+            Name: "cfz-photobot-api"
+            Description: "AI Photo Search application, built during the Cloud and Big Data course at Columbia University."
+            ApiKeySourceType: "HEADER"
+            BinaryMediaTypes:
+              - "image/*"
+            EndpointConfiguration:
+                Types:
+                  - "REGIONAL"
+
+    ApiGatewayStage:
+        Type: "AWS::ApiGateway::Stage"
+        Properties:
+            StageName: "dev"
+            DeploymentId: !Ref ApiGatewayDeployment
+            RestApiId: !Ref ApiGatewayRestApi
+            CacheClusterEnabled: false
+            TracingEnabled: false
+
+    ApiGatewayDeployment:
+        Type: "AWS::ApiGateway::Deployment"
+        DependsOn:
+            - "ApiGatewayMethod"
+            - "ApiGatewayMethod2"
+        Properties:
+            RestApiId: !Ref ApiGatewayRestApi
+
+    ApiGatewayResource:
+        Type: "AWS::ApiGateway::Resource"
+        Properties:
+            RestApiId: !Ref ApiGatewayRestApi
+            PathPart: "search"
+            ParentId: !GetAtt ApiGatewayRestApi.RootResourceId
+
+    ApiGatewayResource2:
+        Type: "AWS::ApiGateway::Resource"
+        Properties:
+            RestApiId: !Ref ApiGatewayRestApi
+            PathPart: "upload"
+            ParentId: !GetAtt ApiGatewayRestApi.RootResourceId
+
+    ApiGatewayMethod:
+        Type: "AWS::ApiGateway::Method"
+        Properties:
+            RestApiId: !Ref ApiGatewayRestApi
+            ResourceId: !Ref ApiGatewayResource
+            HttpMethod: "GET"
+            AuthorizationType: "NONE"
+            ApiKeyRequired: false
+            OperationName: "searchPhotos"
+            RequestParameters:
+                "method.request.querystring.q": false
+            RequestModels: {}
+            MethodResponses:
+              -
+                ResponseModels:
+                    "application/json": !Ref ApiGatewayModel3
+                ResponseParameters: {}
+                StatusCode: "200"
+              -
+                ResponseModels:
+                    "application/json": !Ref ApiGatewayModel4
+                ResponseParameters: {}
+                StatusCode: "403"
+              -
+                ResponseModels:
+                    "application/json": !Ref ApiGatewayModel4
+                ResponseParameters: {}
+                StatusCode: "500"
+            Integration:
+                CacheNamespace: !Ref ApiGatewayResource
+                ContentHandling: "CONVERT_TO_TEXT"
+                IntegrationHttpMethod: "POST"
+                IntegrationResponses:
+                  -
+                    ResponseTemplates: {}
+                    StatusCode: "200"
+                PassthroughBehavior: "WHEN_NO_MATCH"
+                RequestParameters: {}
+                RequestTemplates: {}
+                TimeoutInMillis: 29000
+                Type: "AWS_PROXY"
+                Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${LambdaFunction}/invocations"
+
+    # OPTIONS for /search 
+    ApiGatewayMethod3:
+        Type: "AWS::ApiGateway::Method"
+        Properties:
+            RestApiId: !Ref ApiGatewayRestApi
+            ResourceId: !Ref ApiGatewayResource
+            HttpMethod: "OPTIONS"
+            AuthorizationType: "NONE"
+            ApiKeyRequired: false
+            RequestParameters: {}
+            MethodResponses: 
+              -
+                ResponseParameters: 
+                    "method.response.header.Access-Control-Allow-Headers": false
+                    "method.response.header.Access-Control-Allow-Methods": false
+                    "method.response.header.Access-Control-Allow-Origin": false
+                StatusCode: "200"
+            Integration: 
+                CacheNamespace: !Ref ApiGatewayResource
+                IntegrationResponses: 
+                  - 
+                    ResponseParameters: 
+                        "method.response.header.Access-Control-Allow-Headers": "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+                        "method.response.header.Access-Control-Allow-Methods": "'GET,OPTIONS'"
+                        "method.response.header.Access-Control-Allow-Origin": "'*'"
+                    StatusCode: "200"
+                PassthroughBehavior: "WHEN_NO_MATCH"
+                RequestTemplates: 
+                    "application/json": "{\"statusCode\": 200}"
+                TimeoutInMillis: 29000
+                Type: "MOCK"
+
+    ApiGatewayMethod2:
+        Type: "AWS::ApiGateway::Method"
+        Properties:
+            RestApiId: !Ref ApiGatewayRestApi
+            ResourceId: !Ref ApiGatewayResource2
+            HttpMethod: "PUT"
+            AuthorizationType: "NONE"
+            ApiKeyRequired: false
+            OperationName: "uploadPhoto"
+            RequestParameters:
+                "method.request.header.custom-labels": false
+            RequestModels: {}
+            MethodResponses:
+              -
+                ResponseModels:
+                    "application/json": !Ref ApiGatewayModel2
+                ResponseParameters: 
+                    "method.response.header.Access-Control-Allow-Origin": false
+                StatusCode: "200"
+              -
+                ResponseModels:
+                    "application/json": !Ref ApiGatewayModel4
+                ResponseParameters: {}
+                StatusCode: "403"
+              -
+                ResponseModels:
+                    "application/json": !Ref ApiGatewayModel4
+                ResponseParameters: {}
+                StatusCode: "500"
+            Integration:
+                CacheNamespace: !Ref ApiGatewayResource2
+                Credentials: !GetAtt IAMRole.Arn
+                IntegrationHttpMethod: "PUT"
+                IntegrationResponses:
+                  -
+                    ResponseParameters: 
+                        "method.response.header.Access-Control-Allow-Origin": "'*'"
+                    StatusCode: "200"
+                PassthroughBehavior: "WHEN_NO_MATCH"
+                RequestParameters:
+                    "integration.request.header.x-amz-meta-customlabels": "method.request.header.custom-labels"
+                    "integration.request.path.bucket": !Sub "'${S3Bucket}'"
+                    "integration.request.path.object": "context.requestId"
+                RequestTemplates: {}
+                TimeoutInMillis: 29000
+                Type: "AWS"
+                Uri: !Sub "arn:aws:apigateway:${AWS::Region}:s3:path/{bucket}/{object}"
+
+    # OPTIONS for /upload
+    ApiGatewayMethod4:
+        Type: "AWS::ApiGateway::Method"
+        Properties:
+            RestApiId: !Ref ApiGatewayRestApi
+            ResourceId: !Ref ApiGatewayResource2
+            HttpMethod: "OPTIONS"
+            AuthorizationType: "NONE"
+            ApiKeyRequired: false
+            RequestParameters: {}
+            MethodResponses: 
+              - 
+                ResponseParameters: 
+                    "method.response.header.Access-Control-Allow-Headers": false
+                    "method.response.header.Access-Control-Allow-Methods": false
+                    "method.response.header.Access-Control-Allow-Origin": false
+                StatusCode: "200"
+            Integration: 
+                CacheNamespace: !Ref ApiGatewayResource2
+                IntegrationResponses: 
+                  - 
+                    ResponseParameters: 
+                        "method.response.header.Access-Control-Allow-Headers": "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,custom-labels'"
+                        "method.response.header.Access-Control-Allow-Methods": "'OPTIONS,PUT'"
+                        "method.response.header.Access-Control-Allow-Origin": "'*'"
+                    SelectionPattern: "200"
+                    StatusCode: "200"
+                PassthroughBehavior: "WHEN_NO_MATCH"
+                RequestTemplates: 
+                    "application/json": "{\"statusCode\": 200}"
+                TimeoutInMillis: 29000
+                Type: "MOCK"
+
+    ApiGatewayModel:
+        Type: "AWS::ApiGateway::Model"
+        Properties:
+            RestApiId: !Ref ApiGatewayRestApi
+            Name: "cfzPhoto"
+            Schema: |
+                {
+                  "type" : "object",
+                  "properties" : {
+                    "url" : {
+                      "type" : "string"
+                    },
+                    "labels" : {
+                      "type" : "array",
+                      "items" : {
+                        "type" : "string"
+                      }
+                    }
+                  }
+                }
+
+            ContentType: "application/json"
+
+    ApiGatewayModel2:
+        Type: "AWS::ApiGateway::Model"
+        Properties:
+            RestApiId: !Ref ApiGatewayRestApi
+            Name: "cfzMODELd71852"
+            Schema: |
+                {
+                  "type" : "object",
+                  "properties" : { }
+                }
+
+            ContentType: "application/json"
+
+    ApiGatewayModel3:
+        Type: "AWS::ApiGateway::Model"
+        Properties:
+            RestApiId: !Ref ApiGatewayRestApi
+            Name: "cfzSearchResponse"
+            Schema: !Sub |
+                {
+                  "type" : "object",
+                  "properties" : {
+                    "results" : {
+                      "type" : "array",
+                      "items" : {
+                        "$ref":"https://apigateway.amazonaws.com/restapis/${ApiGatewayRestApi}/models/${ApiGatewayModel}"
+                      }
+                    }
+                  }
+                }
+
+            ContentType: "application/json"
+
+    ApiGatewayModel4:
+        Type: "AWS::ApiGateway::Model"
+        Properties:
+            RestApiId: !Ref ApiGatewayRestApi
+            Name: "cfzError"
+            Schema: |
+                {
+                  "type" : "object",
+                  "properties" : {
+                    "code" : {
+                      "type" : "integer",
+                      "format" : "int32"
+                    },
+                    "message" : {
+                      "type" : "string"
+                    }
+                  }
+                }
+            ContentType: "application/json"
+
+    # S3 Resources
+    ######################################
+    S3Bucket:
+        Type: "AWS::S3::Bucket"
+        DependsOn:
+            - "LambdaFunction2"
+            - "LambdaPermission2"
+        Properties:
+            BucketName: "cfz-wad-csgy-9223-photobot-store"
+            NotificationConfiguration: 
+                LambdaConfigurations: 
+                  - 
+                    Event: "s3:ObjectCreated:Put"
+                    Filter: 
+                        S3Key: 
+                            Rules: 
+                              - 
+                                Name: "Prefix"
+                                Value: ""
+                              - 
+                                Name: "Suffix"
+                                Value: ""
+                    Function: !GetAtt LambdaFunction2.Arn
+
+    S3BucketPolicy:
+        Type: "AWS::S3::BucketPolicy"
+        Properties:
+            Bucket: !Ref S3Bucket
+            PolicyDocument: 
+                Version: "2012-10-17"
+                Statement: 
+                  - 
+                    Sid: "PublicRead"
+                    Effect: "Allow"
+                    Principal: "*"
+                    Action: 
+                      - "s3:GetObject"
+                    Resource: !Sub "arn:aws:s3:::${S3Bucket}/*"
+
+    S3BucketFrontend:
+        Type: "AWS::S3::Bucket"
+        Properties:
+            BucketName: "cfz-wad-csgy-9223-photobot-frontend"
+            WebsiteConfiguration: 
+                IndexDocument: "index.html"
+
+    S3BucketPolicyFrontend:
+        Type: "AWS::S3::BucketPolicy"
+        Properties:
+            Bucket: !Ref S3BucketFrontend
+            PolicyDocument: 
+                Version: "2012-10-17"
+                Statement: 
+                  - 
+                    Sid: "PublicRead"
+                    Effect: "Allow"
+                    Principal: "*"
+                    Action: "s3:GetObject"
+                    Resource: !Sub "arn:aws:s3:::${S3BucketFrontend}/*"
+
+    S3BucketCodePipeline:
+        Type: "AWS::S3::Bucket"
+        Properties:
+            BucketName: !Sub "cfz-codepipeline-${AWS::Region}-260380406818"
+
+    S3BucketPolicyCodePipeline:
+        Type: "AWS::S3::BucketPolicy"
+        Properties:
+            Bucket: !Ref S3BucketCodePipeline
+            PolicyDocument: 
+                Version: "2012-10-17"
+                # Id: "SSEAndSSLPolicy"
+                Statement: 
+                  - 
+                    Sid: "DenyUnEncryptedObjectUploads"
+                    Effect: "Deny"
+                    Principal: "*"
+                    Action: "s3:PutObject"
+                    Resource: !Sub "arn:aws:s3:::${S3BucketCodePipeline}/*"
+                    Condition: 
+                        StringNotEquals: 
+                            "s3:x-amz-server-side-encryption": "aws:kms"
+                  - 
+                    Sid: "DenyInsecureConnections"
+                    Effect: "Deny"
+                    Principal: "*"
+                    Action: "s3:*"
+                    Resource: !Sub "arn:aws:s3:::${S3BucketCodePipeline}/*"
+                    Condition: 
+                        Bool: 
+                            "aws:SecureTransport": "false"
+
+    # Lambda Resources
+    #####################################
+    LambdaFunction:
+        Type: "AWS::Lambda::Function"
+        Properties:
+            Description: ""
+            FunctionName: "cfz-photobot-lf2"
+            Handler: "index.lambda_handler"
+            Architectures:
+              - "x86_64"
+            Environment:
+                Variables:
+                    OPENSEARCH_ENDPOINT: !GetAtt OpenSearchServiceDomain.DomainEndpoint
+                    S3_BUCKET_ENDPOINT: !GetAtt S3Bucket.DomainName
+            Code:
+                ZipFile: |
+                    # CODE WILL INITIALIZE VIA CodePipelinePipelineLf2
+            MemorySize: 128
+            Role: !GetAtt IAMRole2.Arn
+            Runtime: "python3.7"
+            Timeout: 3
+            TracingConfig:
+                Mode: "PassThrough"
+            EphemeralStorage:
+                Size: 512
+
+    LambdaPermission:
+        Type: "AWS::Lambda::Permission"
+        Properties:
+            Action: "lambda:InvokeFunction"
+            FunctionName: !GetAtt LambdaFunction.Arn
+            Principal: "apigateway.amazonaws.com"
+            SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayRestApi}/*/GET/search"
+
+    LambdaFunction2:
+        Type: "AWS::Lambda::Function"
+        Properties:
+            Description: ""
+            FunctionName: "cfz-photobot-lf1"
+            Handler: "index.lambda_handler"
+            Architectures: 
+              - "x86_64"
+            Environment:
+                Variables:
+                    OPENSEARCH_ENDPOINT: !GetAtt OpenSearchServiceDomain.DomainEndpoint
+            Code: 
+                ZipFile: |
+                    # CODE WILL INITIALIZE VIA CodePipelinePipelineLf1
+            MemorySize: 128
+            Role: !GetAtt IAMRole2.Arn
+            Runtime: "python3.7"
+            Timeout: 3
+            TracingConfig: 
+                Mode: "PassThrough"
+            EphemeralStorage: 
+                Size: 512
+
+    LambdaPermission2:
+        Type: "AWS::Lambda::Permission"
+        Properties:
+            Action: "lambda:InvokeFunction"
+            FunctionName: !GetAtt LambdaFunction2.Arn
+            Principal: "s3.amazonaws.com"
+            SourceArn: "arn:aws:s3:::*cfz-wad-csgy-9223-photobot-store*"
+
+    # OpenSearch Resources
+    ###############################
+    OpenSearchServiceDomain:
+        Type: "AWS::OpenSearchService::Domain"
+        Properties:
+            DomainName: "cfz-photobot-es"
+            EngineVersion: "OpenSearch_1.3"
+            ClusterConfig:
+                InstanceCount: 2
+                InstanceType: "t3.small.search"
+            AccessPolicies:
+                Version: '2012-10-17'
+                Statement:
+                    -
+                        Effect: "Allow"
+                        Principal:
+                            AWS: !GetAtt IAMRole2.Arn
+                        Action: "es:*"
+                        Resource: !Sub "arn:aws:es:${AWS::Region}:${AWS::AccountId}:domain/cfz-photobot-es/*"
+            EBSOptions:
+                EBSEnabled: true
+                VolumeType: "gp3"
+                VolumeSize: 10
+                Iops: 3000
+
+
+    # CodePipeline Resources
+    ##################################
+    CodePipelinePipelineFrontend:
+        Type: "AWS::CodePipeline::Pipeline"
+        Properties:
+            Name: "cfz-photobot-frontend"
+            RoleArn: !GetAtt IAMRoleCodePipeline.Arn
+            ArtifactStore: 
+                Location: !Ref S3BucketCodePipeline
+                Type: "S3"
+            Stages: 
+              - 
+                Name: "Source"
+                Actions: 
+                  - 
+                    Name: "Source"
+                    ActionTypeId: 
+                        Category: "Source"
+                        Owner: "ThirdParty"
+                        Provider: "GitHub"
+                        Version: "1"
+                    Configuration: 
+                        Branch: "main"
+                        OAuthToken: '{{resolve:secretsmanager:github_pat:SecretString:token}}'
+                        Owner: "wdickerson"
+                        PollForSourceChanges: "false"
+                        Repo: "csgy-9223-photobot-frontend"
+                    OutputArtifacts: 
+                      - 
+                        Name: "SourceArtifact"
+                    Region: !Ref AWS::Region
+                    Namespace: "SourceVariables"
+                    RunOrder: 1
+              - 
+                Name: "Build"
+                Actions: 
+                  - 
+                    Name: "Build"
+                    ActionTypeId: 
+                        Category: "Build"
+                        Owner: "AWS"
+                        Provider: "CodeBuild"
+                        Version: "1"
+                    Configuration: 
+                        ProjectName: !Ref CodeBuildProjectFrontend
+                    InputArtifacts: 
+                      - 
+                        Name: "SourceArtifact"
+                    OutputArtifacts: 
+                      - 
+                        Name: "BuildArtifact"
+                    Region: !Ref AWS::Region
+                    Namespace: "BuildVariables"
+                    RunOrder: 1
+              - 
+                Name: "Deploy"
+                Actions: 
+                  - 
+                    Name: "Deploy"
+                    ActionTypeId: 
+                        Category: "Deploy"
+                        Owner: "AWS"
+                        Provider: "S3"
+                        Version: "1"
+                    Configuration: 
+                        BucketName: !Ref S3BucketFrontend
+                        Extract: "true"
+                    InputArtifacts: 
+                      - 
+                        Name: "BuildArtifact"
+                    Region: !Ref AWS::Region
+                    Namespace: "DeployVariables"
+                    RunOrder: 1
+
+    # 'GithubWebhook' satisfies two requirements:
+    # -- Means that updates are pushed from GitHub, rather than AWS having to poll
+    # -- Means we can filter for required changes
+    CodePipelineWebhookFrontend:
+        Type: "AWS::CodePipeline::Webhook"
+        Properties:
+            Authentication: "GITHUB_HMAC"
+            AuthenticationConfiguration:
+                SecretToken: '{{resolve:secretsmanager:github_pat:SecretString:token}}'
+            RegisterWithThirdParty: "true"
+            Filters:
+              - 
+                JsonPath: "$.ref"
+                MatchEquals: refs/heads/{Branch}
+            TargetPipeline: !Ref CodePipelinePipelineFrontend
+            TargetAction: "Source"
+            TargetPipelineVersion: !GetAtt CodePipelinePipelineFrontend.Version
+
+    CodeBuildProjectFrontend:
+        Type: "AWS::CodeBuild::Project"
+        Properties:
+            Name: "cfz-photobot-frontend-build"
+            Source: 
+                BuildSpec: !Sub |
+                    version: 0.2
+
+                    phases:
+                        install:
+                            runtime-versions:
+                                nodejs: 16
+                            commands:
+                                - npm install
+                        build:
+                            commands:
+                                - npm run build
+                    artifacts:
+                        files:
+                            - '**/*'
+                        base-directory: build
+
+                InsecureSsl: false
+                Type: "CODEPIPELINE"
+            Artifacts: 
+                EncryptionDisabled: false
+                Name: "cfz-photobot-frontend-build"
+                Packaging: "NONE"
+                Type: "CODEPIPELINE"
+            Cache: 
+                Type: "NO_CACHE"
+            Environment: 
+                ComputeType: "BUILD_GENERAL1_SMALL"
+                EnvironmentVariables: 
+                  - 
+                    Name: "REACT_APP_PHOTOBOT_API_HOST"
+                    Type: "PLAINTEXT"
+                    Value: !Sub "https://${ApiGatewayRestApi}.execute-api.${AWS::Region}.amazonaws.com/${ApiGatewayStage}"
+                Image: "aws/codebuild/standard:6.0"
+                ImagePullCredentialsType: "CODEBUILD"
+                PrivilegedMode: false
+                Type: "LINUX_CONTAINER"
+            ServiceRole: !GetAtt IAMRoleCodeBuild.Arn
+            TimeoutInMinutes: 60
+            QueuedTimeoutInMinutes: 480
+            EncryptionKey: !Sub "arn:aws:kms:${AWS::Region}:${AWS::AccountId}:alias/aws/s3"
+            BadgeEnabled: false
+            LogsConfig: 
+                CloudWatchLogs: 
+                    Status: "ENABLED"
+                S3Logs: 
+                    Status: "DISABLED"
+                    EncryptionDisabled: false
+            Visibility: "PRIVATE"
+
+
+
+
+    CodePipelinePipelineLf1:
+        Type: "AWS::CodePipeline::Pipeline"
+        Properties:
+            Name: "cfz-photobot-lf1"
+            RoleArn: !GetAtt IAMRoleCodePipeline.Arn
+            ArtifactStore: 
+                Location: !Ref S3BucketCodePipeline
+                Type: "S3"
+            Stages: 
+              - 
+                Name: "Source"
+                Actions: 
+                  - 
+                    Name: "Source"
+                    ActionTypeId: 
+                        Category: "Source"
+                        Owner: "ThirdParty"
+                        Provider: "GitHub"
+                        Version: "1"
+                    Configuration: 
+                        Branch: "main"
+                        OAuthToken: '{{resolve:secretsmanager:github_pat:SecretString:token}}'
+                        Owner: "wdickerson"
+                        PollForSourceChanges: "false"
+                        Repo: "csgy-9223-photobot-index"
+                    OutputArtifacts: 
+                      - 
+                        Name: "SourceArtifact"
+                    Region: !Ref AWS::Region
+                    Namespace: "SourceVariables"
+                    RunOrder: 1
+              - 
+                Name: "Deploy"
+                Actions: 
+                  - 
+                    Name: "UploadToLambda"
+                    ActionTypeId: 
+                        Category: "Build"
+                        Owner: "AWS"
+                        Provider: "CodeBuild"
+                        Version: "1"
+                    Configuration: 
+                        ProjectName: !Ref CodeBuildProjectLf1
+                    InputArtifacts: 
+                      - 
+                        Name: "SourceArtifact"
+                    Region: !Ref AWS::Region
+                    RunOrder: 1
+
+    CodePipelineWebhookLf1:
+        Type: "AWS::CodePipeline::Webhook"
+        Properties:
+            Authentication: "GITHUB_HMAC"
+            AuthenticationConfiguration:
+                SecretToken: '{{resolve:secretsmanager:github_pat:SecretString:token}}'
+            RegisterWithThirdParty: "true"
+            Filters:
+              - 
+                JsonPath: "$.ref"
+                MatchEquals: refs/heads/{Branch}
+            TargetPipeline: !Ref CodePipelinePipelineLf1
+            TargetAction: "Source"
+            TargetPipelineVersion: !GetAtt CodePipelinePipelineLf1.Version
+
+    CodeBuildProjectLf1:
+        Type: "AWS::CodeBuild::Project"
+        Properties:
+            Name: "cfz-photobot-lf1-upload"
+            Description: "Just upload a zip file to lambda"
+            Source: 
+                BuildSpec: !Sub |
+                    version: 0.2
+                    
+                    phases:
+                      build:
+                        commands:
+                          - ls
+                          - zip -r package.zip .
+                          - aws lambda update-function-code --function-name arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${LambdaFunction2} --zip-file fileb://package.zip
+                    
+                InsecureSsl: false
+                Type: "CODEPIPELINE"
+            Artifacts: 
+                EncryptionDisabled: false
+                Name: "cfz-photobot-lf1-upload"
+                Packaging: "NONE"
+                Type: "CODEPIPELINE"
+            Cache: 
+                Type: "NO_CACHE"
+            Environment: 
+                ComputeType: "BUILD_GENERAL1_SMALL"
+                Image: "aws/codebuild/standard:6.0"
+                ImagePullCredentialsType: "CODEBUILD"
+                PrivilegedMode: false
+                Type: "LINUX_CONTAINER"
+            ServiceRole: !GetAtt IAMRoleCodeBuild.Arn
+            TimeoutInMinutes: 60
+            QueuedTimeoutInMinutes: 480
+            EncryptionKey: !Sub "arn:aws:kms:${AWS::Region}:${AWS::AccountId}:alias/aws/s3"
+            BadgeEnabled: false
+            LogsConfig: 
+                CloudWatchLogs: 
+                    Status: "ENABLED"
+                S3Logs: 
+                    Status: "DISABLED"
+                    EncryptionDisabled: false
+            Visibility: "PRIVATE"
+
+
+
+
+
+
+    CodePipelinePipelineLf2:
+        Type: "AWS::CodePipeline::Pipeline"
+        Properties:
+            Name: "cfz-photobot-lf2"
+            RoleArn: !GetAtt IAMRoleCodePipeline.Arn
+            ArtifactStore: 
+                Location: !Ref S3BucketCodePipeline
+                Type: "S3"
+            Stages: 
+              - 
+                Name: "Source"
+                Actions: 
+                  - 
+                    Name: "Source"
+                    ActionTypeId: 
+                        Category: "Source"
+                        Owner: "ThirdParty"
+                        Provider: "GitHub"
+                        Version: "1"
+                    Configuration: 
+                        Branch: "main"
+                        OAuthToken: '{{resolve:secretsmanager:github_pat:SecretString:token}}'
+                        Owner: "wdickerson"
+                        PollForSourceChanges: "false"
+                        Repo: "csgy-9223-photobot-search"
+                    OutputArtifacts: 
+                      - 
+                        Name: "SourceArtifact"
+                    Region: !Ref AWS::Region
+                    Namespace: "SourceVariables"
+                    RunOrder: 1
+              - 
+                Name: "Deploy"
+                Actions: 
+                  - 
+                    Name: "UploadToLambda"
+                    ActionTypeId: 
+                        Category: "Build"
+                        Owner: "AWS"
+                        Provider: "CodeBuild"
+                        Version: "1"
+                    Configuration: 
+                        ProjectName: !Ref CodeBuildProjectLf2
+                    InputArtifacts: 
+                      - 
+                        Name: "SourceArtifact"
+                    Region: !Ref AWS::Region
+                    RunOrder: 1
+
+    CodePipelineWebhookLf2:
+        Type: "AWS::CodePipeline::Webhook"
+        Properties:
+            Authentication: "GITHUB_HMAC"
+            AuthenticationConfiguration:
+                SecretToken: '{{resolve:secretsmanager:github_pat:SecretString:token}}'
+            RegisterWithThirdParty: "true"
+            Filters:
+              - 
+                JsonPath: "$.ref"
+                MatchEquals: refs/heads/{Branch}
+            TargetPipeline: !Ref CodePipelinePipelineLf2
+            TargetAction: "Source"
+            TargetPipelineVersion: !GetAtt CodePipelinePipelineLf2.Version
+
+    CodeBuildProjectLf2:
+        Type: "AWS::CodeBuild::Project"
+        Properties:
+            Name: "cfz-photobot-lf2-upload"
+            Description: "Just upload a zip file to lambda"
+            Source: 
+                BuildSpec: !Sub |
+                    version: 0.2
+                    
+                    phases:
+                      build:
+                        commands:
+                          - ls
+                          - zip -r package.zip .
+                          - aws lambda update-function-code --function-name arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${LambdaFunction} --zip-file fileb://package.zip
+                    
+                InsecureSsl: false
+                Type: "CODEPIPELINE"
+            Artifacts: 
+                EncryptionDisabled: false
+                Name: "cfz-photobot-lf2-upload"
+                Packaging: "NONE"
+                Type: "CODEPIPELINE"
+            Cache: 
+                Type: "NO_CACHE"
+            Environment: 
+                ComputeType: "BUILD_GENERAL1_SMALL"
+                Image: "aws/codebuild/standard:6.0"
+                ImagePullCredentialsType: "CODEBUILD"
+                PrivilegedMode: false
+                Type: "LINUX_CONTAINER"
+            ServiceRole: !GetAtt IAMRoleCodeBuild.Arn
+            TimeoutInMinutes: 60
+            QueuedTimeoutInMinutes: 480
+            EncryptionKey: !Sub "arn:aws:kms:${AWS::Region}:${AWS::AccountId}:alias/aws/s3"
+            BadgeEnabled: false
+            LogsConfig: 
+                CloudWatchLogs: 
+                    Status: "ENABLED"
+                S3Logs: 
+                    Status: "DISABLED"
+                    EncryptionDisabled: false
+            Visibility: "PRIVATE"
+
+
+    # IAM Resources
+    #####################################
+    IAMRole:
+        Type: "AWS::IAM::Role"
+        Properties:
+            Path: "/"
+            RoleName: "cfzMyApiGatewayRole"
+            AssumeRolePolicyDocument: "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Sid\":\"\",\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"apigateway.amazonaws.com\"},\"Action\":\"sts:AssumeRole\"}]}"
+            MaxSessionDuration: 3600
+            ManagedPolicyArns:
+              - "arn:aws:iam::aws:policy/service-role/AmazonAPIGatewayPushToCloudWatchLogs"
+              - !Ref IAMManagedPolicy
+            Description: "Allows API Gateway to push logs to CloudWatch Logs and access S3, Lambda, etc."
+
+    IAMRole2:
+        Type: "AWS::IAM::Role"
+        Properties:
+            Path: "/"
+            RoleName: "cfzMyLambdaRole"
+            AssumeRolePolicyDocument: "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"lambda.amazonaws.com\"},\"Action\":\"sts:AssumeRole\"}]}"
+            MaxSessionDuration: 3600
+            ManagedPolicyArns:
+              - "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+              - !Ref IAMManagedPolicy2
+            Description: "Allows Lambda functions to call AWS services on your behalf."
+
+    IAMManagedPolicy:
+        Type: "AWS::IAM::ManagedPolicy"
+        Properties:
+            ManagedPolicyName: "cfzMyApiGatewayPolicy"
+            Path: "/"
+            PolicyDocument: !Sub |
+                {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Sid": "VisualEditor0",
+                            "Effect": "Allow",
+                            "Action": "s3:PutObject",
+                            "Resource": "arn:aws:s3:::*cfz-wad-csgy-9223-photobot-store*/*"
+                        }
+                    ]
+                }
+
+    IAMManagedPolicy2:
+        Type: "AWS::IAM::ManagedPolicy"
+        Properties:
+            ManagedPolicyName: "cfzMyLambdaPolicy"
+            Path: "/"
+            PolicyDocument: !Sub |
+                {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Sid": "VisualEditor0",
+                            "Effect": "Allow",
+                            "Action": [
+                                "lex:RecognizeText",
+                                "lex:PutSession",
+                                "lex:StartConversation",
+                                "lex:RecognizeUtterance",
+                                "s3:GetObject",
+                                "s3:ListBucket"
+                            ],
+                            "Resource": [
+                                "arn:aws:lex:*:${AWS::AccountId}:bot-alias/*/*",
+                                "arn:aws:s3:::*cfz-wad-csgy-9223-photobot-store*/*"
+                            ]
+                        }
+                    ]
+                }
+
+    IAMRoleCodePipeline:
+        Type: "AWS::IAM::Role"
+        Properties:
+            Path: "/service-role/"
+            RoleName: "cfzMyPhotobotCodePipelineRole"
+            AssumeRolePolicyDocument: "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"codepipeline.amazonaws.com\"},\"Action\":\"sts:AssumeRole\"}]}"
+            MaxSessionDuration: 3600
+            ManagedPolicyArns: 
+              - !Ref IAMManagedPolicyCodePipelineAndBuild
+
+    IAMRoleCodeBuild:
+        Type: "AWS::IAM::Role"
+        Properties:
+            Path: "/service-role/"
+            RoleName: "cfzMyPhotobotCodeBuildRole"
+            AssumeRolePolicyDocument: "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"codebuild.amazonaws.com\"},\"Action\":\"sts:AssumeRole\"}]}"
+            MaxSessionDuration: 3600
+            ManagedPolicyArns: 
+              - !Ref IAMManagedPolicyCodePipelineAndBuild
+
+    IAMManagedPolicyCodePipelineAndBuild:
+        Type: "AWS::IAM::ManagedPolicy"
+        Properties:
+            ManagedPolicyName: !Sub "cfzCodeBuildBasePolicy-photobot-build-${AWS::Region}"
+            Path: "/service-role/"
+            PolicyDocument: !Sub |
+                {
+                    "Statement": [
+                        {
+                            "Action": [
+                                "iam:PassRole"
+                            ],
+                            "Resource": "*",
+                            "Effect": "Allow",
+                            "Condition": {
+                                "StringEqualsIfExists": {
+                                    "iam:PassedToService": [
+                                        "cloudformation.amazonaws.com",
+                                        "elasticbeanstalk.amazonaws.com",
+                                        "ec2.amazonaws.com",
+                                        "ecs-tasks.amazonaws.com"
+                                    ]
+                                }
+                            }
+                        },
+                        {
+                            "Action": [
+                                "codecommit:CancelUploadArchive",
+                                "codecommit:GetBranch",
+                                "codecommit:GetCommit",
+                                "codecommit:GetRepository",
+                                "codecommit:GetUploadArchiveStatus",
+                                "codecommit:UploadArchive"
+                            ],
+                            "Resource": "*",
+                            "Effect": "Allow"
+                        },
+                        {
+                            "Action": [
+                                "codedeploy:CreateDeployment",
+                                "codedeploy:GetApplication",
+                                "codedeploy:GetApplicationRevision",
+                                "codedeploy:GetDeployment",
+                                "codedeploy:GetDeploymentConfig",
+                                "codedeploy:RegisterApplicationRevision"
+                            ],
+                            "Resource": "*",
+                            "Effect": "Allow"
+                        },
+                        {
+                            "Action": [
+                                "codestar-connections:UseConnection"
+                            ],
+                            "Resource": "*",
+                            "Effect": "Allow"
+                        },
+                        {
+                            "Action": [
+                                "elasticbeanstalk:*",
+                                "ec2:*",
+                                "elasticloadbalancing:*",
+                                "autoscaling:*",
+                                "cloudwatch:*",
+                                "s3:*",
+                                "sns:*",
+                                "cloudformation:*",
+                                "rds:*",
+                                "sqs:*",
+                                "ecs:*"
+                            ],
+                            "Resource": "*",
+                            "Effect": "Allow"
+                        },
+                        {
+                            "Action": [
+                                "lambda:InvokeFunction",
+                                "lambda:ListFunctions"
+                            ],
+                            "Resource": "*",
+                            "Effect": "Allow"
+                        },
+                        {
+                            "Action": [
+                                "opsworks:CreateDeployment",
+                                "opsworks:DescribeApps",
+                                "opsworks:DescribeCommands",
+                                "opsworks:DescribeDeployments",
+                                "opsworks:DescribeInstances",
+                                "opsworks:DescribeStacks",
+                                "opsworks:UpdateApp",
+                                "opsworks:UpdateStack"
+                            ],
+                            "Resource": "*",
+                            "Effect": "Allow"
+                        },
+                        {
+                            "Action": [
+                                "cloudformation:CreateStack",
+                                "cloudformation:DeleteStack",
+                                "cloudformation:DescribeStacks",
+                                "cloudformation:UpdateStack",
+                                "cloudformation:CreateChangeSet",
+                                "cloudformation:DeleteChangeSet",
+                                "cloudformation:DescribeChangeSet",
+                                "cloudformation:ExecuteChangeSet",
+                                "cloudformation:SetStackPolicy",
+                                "cloudformation:ValidateTemplate"
+                            ],
+                            "Resource": "*",
+                            "Effect": "Allow"
+                        },
+                        {
+                            "Action": [
+                                "codebuild:BatchGetBuilds",
+                                "codebuild:StartBuild",
+                                "codebuild:BatchGetBuildBatches",
+                                "codebuild:StartBuildBatch"
+                            ],
+                            "Resource": "*",
+                            "Effect": "Allow"
+                        },
+                        {
+                            "Effect": "Allow",
+                            "Action": [
+                                "devicefarm:ListProjects",
+                                "devicefarm:ListDevicePools",
+                                "devicefarm:GetRun",
+                                "devicefarm:GetUpload",
+                                "devicefarm:CreateUpload",
+                                "devicefarm:ScheduleRun"
+                            ],
+                            "Resource": "*"
+                        },
+                        {
+                            "Effect": "Allow",
+                            "Action": [
+                                "servicecatalog:ListProvisioningArtifacts",
+                                "servicecatalog:CreateProvisioningArtifact",
+                                "servicecatalog:DescribeProvisioningArtifact",
+                                "servicecatalog:DeleteProvisioningArtifact",
+                                "servicecatalog:UpdateProduct"
+                            ],
+                            "Resource": "*"
+                        },
+                        {
+                            "Effect": "Allow",
+                            "Action": [
+                                "cloudformation:ValidateTemplate"
+                            ],
+                            "Resource": "*"
+                        },
+                        {
+                            "Effect": "Allow",
+                            "Action": [
+                                "ecr:DescribeImages"
+                            ],
+                            "Resource": "*"
+                        },
+                        {
+                            "Effect": "Allow",
+                            "Action": [
+                                "states:DescribeExecution",
+                                "states:DescribeStateMachine",
+                                "states:StartExecution"
+                            ],
+                            "Resource": "*"
+                        },
+                        {
+                            "Effect": "Allow",
+                            "Action": [
+                                "appconfig:StartDeployment",
+                                "appconfig:StopDeployment",
+                                "appconfig:GetDeployment"
+                            ],
+                            "Resource": "*"
+                        },
+                        {
+                            "Effect": "Allow",
+                            "Resource": [
+                                "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/cfz-photobot-frontend-build",
+                                "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/cfz-photobot-frontend-build:*"
+                            ],
+                            "Action": [
+                                "logs:CreateLogGroup",
+                                "logs:CreateLogStream",
+                                "logs:PutLogEvents"
+                            ]
+                        },
+                        {
+                            "Effect": "Allow",
+                            "Resource": [
+                                "arn:aws:s3:::codepipeline-${AWS::Region}-*"
+                            ],
+                            "Action": [
+                                "s3:PutObject",
+                                "s3:GetObject",
+                                "s3:GetObjectVersion",
+                                "s3:GetBucketAcl",
+                                "s3:GetBucketLocation"
+                            ]
+                        },
+                        {
+                            "Effect": "Allow",
+                            "Action": [
+                                "codebuild:CreateReportGroup",
+                                "codebuild:CreateReport",
+                                "codebuild:UpdateReport",
+                                "codebuild:BatchPutTestCases",
+                                "codebuild:BatchPutCodeCoverages"
+                            ],
+                            "Resource": [
+                                "arn:aws:codebuild:${AWS::Region}:${AWS::AccountId}:report-group/cfz-photobot-frontend-build-*"
+                            ]
+                        },
+                        {
+                            "Sid": "VisualEditor0",
+                            "Effect": "Allow",
+                            "Action": [
+                                "s3:GetBucketAcl",
+                                "logs:CreateLogGroup",
+                                "logs:PutLogEvents",
+                                "codebuild:CreateReportGroup",
+                                "codebuild:CreateReport",
+                                "lambda:UpdateFunctionCode",
+                                "s3:PutObject",
+                                "s3:GetObject",
+                                "logs:CreateLogStream",
+                                "codebuild:UpdateReport",
+                                "codebuild:BatchPutCodeCoverages",
+                                "codebuild:BatchPutTestCases",
+                                "s3:GetBucketLocation",
+                                "s3:GetObjectVersion"
+                            ],
+                            "Resource": [
+                                "arn:aws:codebuild:${AWS::Region}:${AWS::AccountId}:report-group/cfz-photobot-lf1-upload-*",
+                                "arn:aws:codebuild:${AWS::Region}:${AWS::AccountId}:report-group/cfz-photobot-lf2-upload-*",
+                                "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${LambdaFunction}",
+                                "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${LambdaFunction2}",
+                                "arn:aws:s3:::codepipeline-${AWS::Region}-*",
+                                "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/cfz-photobot-lf1-upload",
+                                "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/cfz-photobot-lf1-upload:*",
+                                "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/cfz-photobot-lf2-upload",
+                                "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/cfz-photobot-lf2-upload:*"
+                            ]
+                        }
+                    ],
+                    "Version": "2012-10-17"
+                }
