@@ -600,6 +600,14 @@ Resources:
                     Name: "REACT_APP_PHOTOBOT_API_HOST"
                     Type: "PLAINTEXT"
                     Value: !Sub "https://${ApiGatewayRestApi}.execute-api.${AWS::Region}.amazonaws.com/${ApiGatewayStage}"
+                  - 
+                    Name: "REACT_APP_TRANSCRIBE_ID"
+                    Type: "PLAINTEXT"
+                    Value: !Ref IAMAccessKeyTranscribe
+                  - 
+                    Name: "REACT_APP_TRANSCRIBE_KEY"
+                    Type: "PLAINTEXT"
+                    Value: !GetAtt IAMAccessKeyTranscribe.SecretAccessKey
                 Image: "aws/codebuild/standard:6.0"
                 ImagePullCredentialsType: "CODEBUILD"
                 PrivilegedMode: false
@@ -1025,6 +1033,38 @@ Resources:
             AssumeRolePolicyDocument: "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"lambda.amazonaws.com\"},\"Action\":\"sts:AssumeRole\"},{\"Sid\":\"Statement1\",\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"lexv2.amazonaws.com\"},\"Action\":\"sts:AssumeRole\"}]}"
             MaxSessionDuration: 3600
             Description: "Allows Lex V2 bots to call AWS services on your behalf."
+
+    IAMAccessKeyTranscribe:
+        Type: "AWS::IAM::AccessKey"
+        Properties:
+            Status: "Active"
+            UserName: !Ref IAMUserTranscribe
+
+    IAMUserTranscribe:
+        Type: "AWS::IAM::User"
+        Properties:
+            Path: "/"
+            UserName: "cfy-transcribe-user"
+            ManagedPolicyArns: 
+              - !Ref IAMManagedPolicyTranscribe
+
+    IAMManagedPolicyTranscribe:
+        Type: "AWS::IAM::ManagedPolicy"
+        Properties:
+            ManagedPolicyName: "cfyMyTranscribePolicy"
+            Path: "/"
+            PolicyDocument: |
+                {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Sid": "VisualEditor0",
+                            "Effect": "Allow",
+                            "Action": "transcribe:StartStreamTranscriptionWebSocket",
+                            "Resource": "*"
+                        }
+                    ]
+                }
 
     IAMRoleCodePipeline:
         Type: "AWS::IAM::Role"
