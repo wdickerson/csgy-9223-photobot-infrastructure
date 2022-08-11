@@ -4,6 +4,8 @@ Outputs:
     ApiHost:
         Value: !Sub "https://${ApiGatewayRestApi}.execute-api.${AWS::Region}.amazonaws.com/${ApiGatewayStage}"
     FrontendUrl:
+        Value: !GetAtt CloudFrontDistributionFrontend.DomainName
+    FrontendUrl:
         Value: !GetAtt
             - S3BucketFrontend
             - WebsiteURL
@@ -945,6 +947,52 @@ Resources:
             BotId: !Ref LexBot
             BotAliasName: "cfyPhotobotAlias"
             BotVersion: !GetAtt LexBotVersion.BotVersion
+
+    # CloudFormation Resources
+    #####################################
+    CloudFrontDistributionFrontend:
+        Type: "AWS::CloudFront::Distribution"
+        Properties:
+            DistributionConfig: 
+                Origins: 
+                  - 
+                    ConnectionAttempts: 3
+                    ConnectionTimeout: 10
+                    DomainName: !Sub "${S3BucketFrontend}.s3.${AWS::Region}.amazonaws.com"
+                    Id: !Sub "${S3BucketFrontend}.s3.${AWS::Region}.amazonaws.com"
+                    OriginPath: ""
+                    S3OriginConfig: 
+                        OriginAccessIdentity: ""
+                DefaultCacheBehavior: 
+                    AllowedMethods: 
+                      - "HEAD"
+                      - "DELETE"
+                      - "POST"
+                      - "GET"
+                      - "OPTIONS"
+                      - "PUT"
+                      - "PATCH"
+                    CachedMethods: 
+                      - "HEAD"
+                      - "GET"
+                    Compress: true
+                    # The following ID is specified by AWS
+                    CachePolicyId: "658327ea-f89d-4fab-a63d-7e88639e58f6"
+                    SmoothStreaming: false
+                    TargetOriginId: !Sub "${S3BucketFrontend}.s3.${AWS::Region}.amazonaws.com"
+                    ViewerProtocolPolicy: "redirect-to-https"
+                Comment: ""
+                PriceClass: "PriceClass_100"
+                Enabled: true
+                ViewerCertificate: 
+                    CloudFrontDefaultCertificate: true
+                    # MinimumProtocolVersion: "TLSv1"
+                Restrictions: 
+                    GeoRestriction: 
+                        RestrictionType: "none"
+                HttpVersion: "http2"
+                DefaultRootObject: "index.html"
+                IPV6Enabled: false
 
     # IAM Resources
     #####################################
