@@ -896,6 +896,28 @@ Resources:
                                     Value: new york
                                 - SampleValue:
                                     Value: brooklyn bridge
+                                - SampleValue:
+                                    Value: umbrella
+                                - SampleValue:
+                                    Value: smoothie
+                                - SampleValue:
+                                    Value: phone
+                                - SampleValue:
+                                    Value: table
+                                - SampleValue:
+                                    Value: building
+                                - SampleValue:
+                                    Value: people
+                                - SampleValue:
+                                    Value: baseball
+                                - SampleValue:
+                                    Value: pickles
+                                - SampleValue:
+                                    Value: adventure
+                                - SampleValue:
+                                    Value: outdoors
+                                - SampleValue:
+                                    Value: salad
                             ValueSelectionSetting:
                                 ResolutionStrategy: ORIGINAL_VALUE
                     Intents:
