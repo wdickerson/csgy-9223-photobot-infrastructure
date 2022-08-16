@@ -1,0 +1,273 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Just Opensearch"
+Resources:
+
+    # OpenSearch Resources
+    ###############################
+    OpenSearchServiceDomain:
+        Type: "AWS::OpenSearchService::Domain"
+        Properties:
+            DomainName: "cfz-photobot-es"
+            EngineVersion: "OpenSearch_1.3"
+            ClusterConfig:
+                InstanceCount: 2
+                InstanceType: "t3.small.search"
+            AccessPolicies:
+                Version: '2012-10-17'
+                Statement:
+                    -
+                        Effect: "Allow"
+                        Principal:
+                            AWS: !GetAtt IAMRoleLambda.Arn
+                        Action: "es:*"
+                        Resource: !Sub "arn:aws:es:${AWS::Region}:${AWS::AccountId}:domain/cfz-photobot-es/*"
+            EBSOptions:
+                EBSEnabled: true
+                VolumeType: "gp3"
+                VolumeSize: 10
+                Iops: 3000
+
+
+
+
+    # Lex Resources
+    #####################################
+    LexBot:
+        Type: AWS::Lex::Bot
+        Properties:
+            Name: "cfzPhotobot"
+            RoleArn: !GetAtt IAMRoleLex.Arn
+            DataPrivacy:
+                ChildDirected: false
+            IdleSessionTTLInSeconds: 300
+            Description: "Let users search for photos with natural language"
+            AutoBuildBotLocales: true
+            BotLocales:
+                -   LocaleId: "en_US"
+                    NluConfidenceThreshold: 0.40
+                    VoiceSettings:
+                        VoiceId: "Ivy"
+                    SlotTypes:
+                        -   Name: "Label"
+                            Description: "Example labels for photos"
+                            SlotTypeValues:
+                                - SampleValue:
+                                    Value: bulldog
+                                - SampleValue:
+                                    Value: puppies
+                                - SampleValue:
+                                    Value: beach
+                                - SampleValue:
+                                    Value: ice cream
+                                - SampleValue:
+                                    Value: fire engine
+                                - SampleValue:
+                                    Value: flowers
+                                - SampleValue:
+                                    Value: trees
+                                - SampleValue:
+                                    Value: birds
+                                - SampleValue:
+                                    Value: food
+                                - SampleValue:
+                                    Value: tacos
+                                - SampleValue:
+                                    Value: new york
+                                - SampleValue:
+                                    Value: brooklyn bridge
+                                - SampleValue:
+                                    Value: umbrella
+                                - SampleValue:
+                                    Value: smoothie
+                                - SampleValue:
+                                    Value: phone
+                                - SampleValue:
+                                    Value: table
+                                - SampleValue:
+                                    Value: building
+                                - SampleValue:
+                                    Value: people
+                                - SampleValue:
+                                    Value: baseball
+                                - SampleValue:
+                                    Value: pickles
+                                - SampleValue:
+                                    Value: adventure
+                                - SampleValue:
+                                    Value: outdoors
+                                - SampleValue:
+                                    Value: salad
+                            ValueSelectionSetting:
+                                ResolutionStrategy: ORIGINAL_VALUE
+                    Intents:
+                        -   Name: "SearchIntent"
+                            SampleUtterances:
+                                - Utterance: "Show me photos of {label}"
+                                - Utterance: ",  ,  and {label}"
+                                - Utterance: "show me {label} and"
+                                - Utterance: "show me {label} or"
+                                - Utterance: "find {label}"
+                                - Utterance: "photos of {label} or"
+                                - Utterance: "pics of {label}"
+                                - Utterance: "pictures of {label} ,  , or"
+                                - Utterance: "pics of {label} ,  , or"
+                                - Utterance: "i want to see {label} ,  , or"
+                            SlotPriorities:
+                                -   Priority: 1
+                                    SlotName: label
+                            Slots:
+                                -   Name: "label"
+                                    SlotTypeName: "Label"
+                                    MultipleValuesSetting:
+                                        AllowMultipleValues: true
+                                    ValueElicitationSetting:
+                                        SlotConstraint: "Required"
+                                        PromptSpecification:
+                                            MessageGroupsList:
+                                                -   Message:
+                                                        PlainTextMessage:
+                                                            Value: "What photos would you like to see?"
+                                            MaxRetries: 3
+                                            AllowInterrupt: false
+                        -   Name: "FallbackIntent"
+                            Description: "Default intent when no other intent matches"
+                            ParentIntentSignature: "AMAZON.FallbackIntent"
+ 
+    LexBotVersion:
+        Type: AWS::Lex::BotVersion
+        Properties:
+            BotId: !Ref LexBot
+            BotVersionLocaleSpecification:
+                -   LocaleId: en_US
+                    BotVersionLocaleDetails:
+                        SourceBotVersion: DRAFT
+
+    LexBotAlias:
+        Type: AWS::Lex::BotAlias
+        Properties:
+            BotId: !Ref LexBot
+            BotAliasName: "cfzPhotobotAlias"
+            BotAliasLocaleSettings:
+              - LocaleId: en_US
+                BotAliasLocaleSetting:
+                    Enabled: true
+            BotVersion: !GetAtt LexBotVersion.BotVersion
+
+    # IAM Resources
+    #####################################
+    IAMRoleApiGateway:
+        Type: "AWS::IAM::Role"
+        Properties:
+            Path: "/"
+            RoleName: "cfzMyApiGatewayRole"
+            AssumeRolePolicyDocument: "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Sid\":\"\",\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"apigateway.amazonaws.com\"},\"Action\":\"sts:AssumeRole\"}]}"
+            MaxSessionDuration: 3600
+            ManagedPolicyArns:
+              - "arn:aws:iam::aws:policy/service-role/AmazonAPIGatewayPushToCloudWatchLogs"
+              - !Ref IAMManagedPolicyApiGateway
+            Description: "Allows API Gateway to push logs to CloudWatch Logs and access S3, Lambda, etc."
+
+    IAMManagedPolicyApiGateway:
+        Type: "AWS::IAM::ManagedPolicy"
+        Properties:
+            ManagedPolicyName: "cfzMyApiGatewayPolicy"
+            Path: "/"
+            PolicyDocument: !Sub |
+                {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Sid": "VisualEditor0",
+                            "Effect": "Allow",
+                            "Action": "s3:PutObject",
+                            "Resource": "arn:aws:s3:::*cfz-wad-csgy-9223-photobot-store*/*"
+                        }
+                    ]
+                }
+
+    IAMRoleLambda:
+        Type: "AWS::IAM::Role"
+        Properties:
+            Path: "/"
+            RoleName: "cfzMyLambdaRole"
+            AssumeRolePolicyDocument: "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"lambda.amazonaws.com\"},\"Action\":\"sts:AssumeRole\"}]}"
+            MaxSessionDuration: 3600
+            ManagedPolicyArns:
+              - "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+              - !Ref IAMManagedPolicyLambda
+            Description: "Allows Lambda functions to call AWS services on your behalf."
+
+    IAMManagedPolicyLambda:
+        Type: "AWS::IAM::ManagedPolicy"
+        Properties:
+            ManagedPolicyName: "cfzMyLambdaPolicy"
+            Path: "/"
+            PolicyDocument: !Sub |
+                {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Sid": "VisualEditor1",
+                            "Effect": "Allow",
+                            "Action": "rekognition:*",
+                            "Resource": "*"
+                        },
+                        {
+                            "Sid": "VisualEditor0",
+                            "Effect": "Allow",
+                            "Action": [
+                                "lex:RecognizeText",
+                                "lex:PutSession",
+                                "lex:StartConversation",
+                                "lex:RecognizeUtterance",
+                                "s3:GetObject",
+                                "s3:ListBucket"
+                            ],
+                            "Resource": [
+                                "arn:aws:lex:*:${AWS::AccountId}:bot-alias/*/*",
+                                "arn:aws:s3:::*cfz-wad-csgy-9223-photobot-store*/*"
+                            ]
+                        }
+                    ]
+                }
+
+    IAMRoleLex:
+        Type: "AWS::IAM::Role"
+        Properties:
+            Path: "/"
+            RoleName: "cfzMyLexRole"
+            AssumeRolePolicyDocument: "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"lambda.amazonaws.com\"},\"Action\":\"sts:AssumeRole\"},{\"Sid\":\"Statement1\",\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"lexv2.amazonaws.com\"},\"Action\":\"sts:AssumeRole\"}]}"
+            MaxSessionDuration: 3600
+            Description: "Allows Lex V2 bots to call AWS services on your behalf."
+
+    IAMUserTranscribe:
+        Type: "AWS::IAM::User"
+        Properties:
+            Path: "/"
+            UserName: "cfz-transcribe-user"
+            ManagedPolicyArns: 
+              - !Ref IAMManagedPolicyTranscribe
+
+    IAMManagedPolicyTranscribe:
+        Type: "AWS::IAM::ManagedPolicy"
+        Properties:
+            ManagedPolicyName: "cfzMyTranscribePolicy"
+            Path: "/"
+            PolicyDocument: |
+                {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Sid": "VisualEditor0",
+                            "Effect": "Allow",
+                            "Action": "transcribe:StartStreamTranscriptionWebSocket",
+                            "Resource": "*"
+                        }
+                    ]
+                }
+
+    IAMAccessKeyTranscribe:
+        Type: "AWS::IAM::AccessKey"
+        Properties:
+            Status: "Active"
+            UserName: !Ref IAMUserTranscribe

@@ -4,7 +4,7 @@ Outputs:
     ApiHost:
         Value: !Sub "https://${ApiGatewayRestApi}.execute-api.${AWS::Region}.amazonaws.com/${ApiGatewayStage}"
     CloudfrontFrontendUrl:
-        Value: !GetAtt CloudFrontDistributionFrontend.DomainName
+        Value: !GetAtt CloudFrontDistribution.DomainName
     S3FrontendUrl:
         Value: !GetAtt
             - S3BucketFrontend
@@ -36,30 +36,30 @@ Resources:
     ApiGatewayDeployment:
         Type: "AWS::ApiGateway::Deployment"
         DependsOn:
-            - "ApiGatewayMethod"
-            - "ApiGatewayMethod2"
+            - "ApiGatewayMethodGet"
+            - "ApiGatewayMethodPut"
         Properties:
             RestApiId: !Ref ApiGatewayRestApi
 
-    ApiGatewayResource:
+    ApiGatewayResourceSearch:
         Type: "AWS::ApiGateway::Resource"
         Properties:
             RestApiId: !Ref ApiGatewayRestApi
             PathPart: "search"
             ParentId: !GetAtt ApiGatewayRestApi.RootResourceId
 
-    ApiGatewayResource2:
+    ApiGatewayResourceUpload:
         Type: "AWS::ApiGateway::Resource"
         Properties:
             RestApiId: !Ref ApiGatewayRestApi
             PathPart: "upload"
             ParentId: !GetAtt ApiGatewayRestApi.RootResourceId
 
-    ApiGatewayMethod:
+    ApiGatewayMethodGet:
         Type: "AWS::ApiGateway::Method"
         Properties:
             RestApiId: !Ref ApiGatewayRestApi
-            ResourceId: !Ref ApiGatewayResource
+            ResourceId: !Ref ApiGatewayResourceSearch
             HttpMethod: "GET"
             AuthorizationType: "NONE"
             ApiKeyRequired: false
@@ -70,21 +70,21 @@ Resources:
             MethodResponses:
               -
                 ResponseModels:
-                    "application/json": !Ref ApiGatewayModel3
+                    "application/json": !Ref ApiGatewayModelSearchResponse
                 ResponseParameters: {}
                 StatusCode: "200"
               -
                 ResponseModels:
-                    "application/json": !Ref ApiGatewayModel4
+                    "application/json": !Ref ApiGatewayModelError
                 ResponseParameters: {}
                 StatusCode: "403"
               -
                 ResponseModels:
-                    "application/json": !Ref ApiGatewayModel4
+                    "application/json": !Ref ApiGatewayModelError
                 ResponseParameters: {}
                 StatusCode: "500"
             Integration:
-                CacheNamespace: !Ref ApiGatewayResource
+                CacheNamespace: !Ref ApiGatewayResourceSearch
                 ContentHandling: "CONVERT_TO_TEXT"
                 IntegrationHttpMethod: "POST"
                 IntegrationResponses:
@@ -96,14 +96,14 @@ Resources:
                 RequestTemplates: {}
                 TimeoutInMillis: 29000
                 Type: "AWS_PROXY"
-                Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${LambdaFunction}/invocations"
+                Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${LambdaFunctionSearch}/invocations"
 
     # OPTIONS for /search 
-    ApiGatewayMethod3:
+    ApiGatewayMethodOptionsSearch:
         Type: "AWS::ApiGateway::Method"
         Properties:
             RestApiId: !Ref ApiGatewayRestApi
-            ResourceId: !Ref ApiGatewayResource
+            ResourceId: !Ref ApiGatewayResourceSearch
             HttpMethod: "OPTIONS"
             AuthorizationType: "NONE"
             ApiKeyRequired: false
@@ -116,7 +116,7 @@ Resources:
                     "method.response.header.Access-Control-Allow-Origin": false
                 StatusCode: "200"
             Integration: 
-                CacheNamespace: !Ref ApiGatewayResource
+                CacheNamespace: !Ref ApiGatewayResourceSearch
                 IntegrationResponses: 
                   - 
                     ResponseParameters: 
@@ -130,11 +130,11 @@ Resources:
                 TimeoutInMillis: 29000
                 Type: "MOCK"
 
-    ApiGatewayMethod2:
+    ApiGatewayMethodPut:
         Type: "AWS::ApiGateway::Method"
         Properties:
             RestApiId: !Ref ApiGatewayRestApi
-            ResourceId: !Ref ApiGatewayResource2
+            ResourceId: !Ref ApiGatewayResourceUpload
             HttpMethod: "PUT"
             AuthorizationType: "NONE"
             ApiKeyRequired: false
@@ -145,23 +145,23 @@ Resources:
             MethodResponses:
               -
                 ResponseModels:
-                    "application/json": !Ref ApiGatewayModel2
+                    "application/json": !Ref ApiGatewayModelGeneric
                 ResponseParameters: 
                     "method.response.header.Access-Control-Allow-Origin": false
                 StatusCode: "200"
               -
                 ResponseModels:
-                    "application/json": !Ref ApiGatewayModel4
+                    "application/json": !Ref ApiGatewayModelError
                 ResponseParameters: {}
                 StatusCode: "403"
               -
                 ResponseModels:
-                    "application/json": !Ref ApiGatewayModel4
+                    "application/json": !Ref ApiGatewayModelError
                 ResponseParameters: {}
                 StatusCode: "500"
             Integration:
-                CacheNamespace: !Ref ApiGatewayResource2
-                Credentials: !GetAtt IAMRole.Arn
+                CacheNamespace: !Ref ApiGatewayResourceUpload
+                Credentials: !GetAtt IAMRoleApiGateway.Arn
                 IntegrationHttpMethod: "PUT"
                 IntegrationResponses:
                   -
@@ -171,7 +171,7 @@ Resources:
                 PassthroughBehavior: "WHEN_NO_MATCH"
                 RequestParameters:
                     "integration.request.header.x-amz-meta-customlabels": "method.request.header.custom-labels"
-                    "integration.request.path.bucket": !Sub "'${S3Bucket}'"
+                    "integration.request.path.bucket": !Sub "'${S3BucketStore}'"
                     "integration.request.path.object": "context.requestId"
                 RequestTemplates: {}
                 TimeoutInMillis: 29000
@@ -179,11 +179,11 @@ Resources:
                 Uri: !Sub "arn:aws:apigateway:${AWS::Region}:s3:path/{bucket}/{object}"
 
     # OPTIONS for /upload
-    ApiGatewayMethod4:
+    ApiGatewayMethodOptionsPut:
         Type: "AWS::ApiGateway::Method"
         Properties:
             RestApiId: !Ref ApiGatewayRestApi
-            ResourceId: !Ref ApiGatewayResource2
+            ResourceId: !Ref ApiGatewayResourceUpload
             HttpMethod: "OPTIONS"
             AuthorizationType: "NONE"
             ApiKeyRequired: false
@@ -196,7 +196,7 @@ Resources:
                     "method.response.header.Access-Control-Allow-Origin": false
                 StatusCode: "200"
             Integration: 
-                CacheNamespace: !Ref ApiGatewayResource2
+                CacheNamespace: !Ref ApiGatewayResourceUpload
                 IntegrationResponses: 
                   - 
                     ResponseParameters: 
@@ -211,7 +211,7 @@ Resources:
                 TimeoutInMillis: 29000
                 Type: "MOCK"
 
-    ApiGatewayModel:
+    ApiGatewayModelPhoto:
         Type: "AWS::ApiGateway::Model"
         Properties:
             RestApiId: !Ref ApiGatewayRestApi
@@ -234,11 +234,11 @@ Resources:
 
             ContentType: "application/json"
 
-    ApiGatewayModel2:
+    ApiGatewayModelGeneric:
         Type: "AWS::ApiGateway::Model"
         Properties:
             RestApiId: !Ref ApiGatewayRestApi
-            Name: "cfzMODELd71852"
+            Name: "cfzGenericResponse"
             Schema: |
                 {
                   "type" : "object",
@@ -247,7 +247,7 @@ Resources:
 
             ContentType: "application/json"
 
-    ApiGatewayModel3:
+    ApiGatewayModelSearchResponse:
         Type: "AWS::ApiGateway::Model"
         Properties:
             RestApiId: !Ref ApiGatewayRestApi
@@ -259,7 +259,7 @@ Resources:
                     "results" : {
                       "type" : "array",
                       "items" : {
-                        "$ref":"https://apigateway.amazonaws.com/restapis/${ApiGatewayRestApi}/models/${ApiGatewayModel}"
+                        "$ref":"https://apigateway.amazonaws.com/restapis/${ApiGatewayRestApi}/models/${ApiGatewayModelPhoto}"
                       }
                     }
                   }
@@ -267,7 +267,7 @@ Resources:
 
             ContentType: "application/json"
 
-    ApiGatewayModel4:
+    ApiGatewayModelError:
         Type: "AWS::ApiGateway::Model"
         Properties:
             RestApiId: !Ref ApiGatewayRestApi
@@ -289,11 +289,11 @@ Resources:
 
     # S3 Resources
     ######################################
-    S3Bucket:
+    S3BucketStore:
         Type: "AWS::S3::Bucket"
         DependsOn:
-            - "LambdaFunction2"
-            - "LambdaPermission2"
+            - "LambdaFunctionUpload"
+            - "LambdaPermissionUpload"
         Properties:
             BucketName: "cfz-wad-csgy-9223-photobot-store"
             NotificationConfiguration: 
@@ -309,12 +309,12 @@ Resources:
                               - 
                                 Name: "Suffix"
                                 Value: ""
-                    Function: !GetAtt LambdaFunction2.Arn
+                    Function: !GetAtt LambdaFunctionUpload.Arn
 
-    S3BucketPolicy:
+    S3BucketPolicyStore:
         Type: "AWS::S3::BucketPolicy"
         Properties:
-            Bucket: !Ref S3Bucket
+            Bucket: !Ref S3BucketStore
             PolicyDocument: 
                 Version: "2012-10-17"
                 Statement: 
@@ -324,7 +324,7 @@ Resources:
                     Principal: "*"
                     Action: 
                       - "s3:GetObject"
-                    Resource: !Sub "arn:aws:s3:::${S3Bucket}/*"
+                    Resource: !Sub "arn:aws:s3:::${S3BucketStore}/*"
 
     S3BucketFrontend:
         Type: "AWS::S3::Bucket"
@@ -381,41 +381,7 @@ Resources:
 
     # Lambda Resources
     #####################################
-    LambdaFunction:
-        Type: "AWS::Lambda::Function"
-        Properties:
-            Description: ""
-            FunctionName: "cfz-photobot-lf2"
-            Handler: "index.lambda_handler"
-            Architectures:
-              - "x86_64"
-            Environment:
-                Variables:
-                    OPENSEARCH_ENDPOINT: !GetAtt OpenSearchServiceDomain.DomainEndpoint
-                    S3_BUCKET_ENDPOINT: !GetAtt S3Bucket.DomainName
-                    LEX_BOT_ID: !GetAtt LexBot.Id
-                    LEX_ALIAS_ID: !GetAtt LexBotAlias.BotAliasId
-            Code:
-                ZipFile: |
-                    # CODE WILL INITIALIZE VIA CodePipelinePipelineLf2
-            MemorySize: 128
-            Role: !GetAtt IAMRole2.Arn
-            Runtime: "python3.7"
-            Timeout: 10
-            TracingConfig:
-                Mode: "PassThrough"
-            EphemeralStorage:
-                Size: 512
-
-    LambdaPermission:
-        Type: "AWS::Lambda::Permission"
-        Properties:
-            Action: "lambda:InvokeFunction"
-            FunctionName: !GetAtt LambdaFunction.Arn
-            Principal: "apigateway.amazonaws.com"
-            SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayRestApi}/*/GET/search"
-
-    LambdaFunction2:
+    LambdaFunctionUpload:
         Type: "AWS::Lambda::Function"
         Properties:
             Description: ""
@@ -428,9 +394,9 @@ Resources:
                     OPENSEARCH_ENDPOINT: !GetAtt OpenSearchServiceDomain.DomainEndpoint
             Code: 
                 ZipFile: |
-                    # CODE WILL INITIALIZE VIA CodePipelinePipelineLf1
+                    # CODE WILL INITIALIZE VIA CodePipelinePipelineUpload
             MemorySize: 128
-            Role: !GetAtt IAMRole2.Arn
+            Role: !GetAtt IAMRoleLambda.Arn
             Runtime: "python3.7"
             Timeout: 3
             TracingConfig: 
@@ -438,13 +404,47 @@ Resources:
             EphemeralStorage: 
                 Size: 512
 
-    LambdaPermission2:
+    LambdaPermissionUpload:
         Type: "AWS::Lambda::Permission"
         Properties:
             Action: "lambda:InvokeFunction"
-            FunctionName: !GetAtt LambdaFunction2.Arn
+            FunctionName: !GetAtt LambdaFunctionUpload.Arn
             Principal: "s3.amazonaws.com"
             SourceArn: "arn:aws:s3:::*cfz-wad-csgy-9223-photobot-store*"
+
+    LambdaFunctionSearch:
+        Type: "AWS::Lambda::Function"
+        Properties:
+            Description: ""
+            FunctionName: "cfz-photobot-lf2"
+            Handler: "index.lambda_handler"
+            Architectures:
+              - "x86_64"
+            Environment:
+                Variables:
+                    OPENSEARCH_ENDPOINT: !GetAtt OpenSearchServiceDomain.DomainEndpoint
+                    S3_BUCKET_ENDPOINT: !GetAtt S3BucketStore.DomainName
+                    LEX_BOT_ID: !GetAtt LexBot.Id
+                    LEX_ALIAS_ID: !GetAtt LexBotAlias.BotAliasId
+            Code:
+                ZipFile: |
+                    # CODE WILL INITIALIZE VIA CodePipelinePipelineSearch
+            MemorySize: 128
+            Role: !GetAtt IAMRoleLambda.Arn
+            Runtime: "python3.7"
+            Timeout: 10
+            TracingConfig:
+                Mode: "PassThrough"
+            EphemeralStorage:
+                Size: 512
+
+    LambdaPermissionSearch:
+        Type: "AWS::Lambda::Permission"
+        Properties:
+            Action: "lambda:InvokeFunction"
+            FunctionName: !GetAtt LambdaFunctionSearch.Arn
+            Principal: "apigateway.amazonaws.com"
+            SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayRestApi}/*/GET/search"
 
     # OpenSearch Resources
     ###############################
@@ -462,7 +462,7 @@ Resources:
                     -
                         Effect: "Allow"
                         Principal:
-                            AWS: !GetAtt IAMRole2.Arn
+                            AWS: !GetAtt IAMRoleLambda.Arn
                         Action: "es:*"
                         Resource: !Sub "arn:aws:es:${AWS::Region}:${AWS::AccountId}:domain/cfz-photobot-es/*"
             EBSOptions:
@@ -627,10 +627,7 @@ Resources:
                     EncryptionDisabled: false
             Visibility: "PRIVATE"
 
-
-
-
-    CodePipelinePipelineLf1:
+    CodePipelinePipelineUpload:
         Type: "AWS::CodePipeline::Pipeline"
         Properties:
             Name: "cfz-photobot-lf1"
@@ -672,14 +669,14 @@ Resources:
                         Provider: "CodeBuild"
                         Version: "1"
                     Configuration: 
-                        ProjectName: !Ref CodeBuildProjectLf1
+                        ProjectName: !Ref CodeBuildProjectUpload
                     InputArtifacts: 
                       - 
                         Name: "SourceArtifact"
                     Region: !Ref AWS::Region
                     RunOrder: 1
 
-    CodePipelineWebhookLf1:
+    CodePipelineWebhookUpload:
         Type: "AWS::CodePipeline::Webhook"
         Properties:
             Authentication: "GITHUB_HMAC"
@@ -690,11 +687,11 @@ Resources:
               - 
                 JsonPath: "$.ref"
                 MatchEquals: refs/heads/{Branch}
-            TargetPipeline: !Ref CodePipelinePipelineLf1
+            TargetPipeline: !Ref CodePipelinePipelineUpload
             TargetAction: "Source"
-            TargetPipelineVersion: !GetAtt CodePipelinePipelineLf1.Version
+            TargetPipelineVersion: !GetAtt CodePipelinePipelineUpload.Version
 
-    CodeBuildProjectLf1:
+    CodeBuildProjectUpload:
         Type: "AWS::CodeBuild::Project"
         Properties:
             Name: "cfz-photobot-lf1-upload"
@@ -702,14 +699,12 @@ Resources:
             Source: 
                 BuildSpec: !Sub |
                     version: 0.2
-                    
                     phases:
                       build:
                         commands:
                           - ls
                           - zip -r package.zip .
-                          - aws lambda update-function-code --function-name arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${LambdaFunction2} --zip-file fileb://package.zip
-                    
+                          - aws lambda update-function-code --function-name arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${LambdaFunctionUpload} --zip-file fileb://package.zip
                 InsecureSsl: false
                 Type: "CODEPIPELINE"
             Artifacts: 
@@ -738,12 +733,7 @@ Resources:
                     EncryptionDisabled: false
             Visibility: "PRIVATE"
 
-
-
-
-
-
-    CodePipelinePipelineLf2:
+    CodePipelinePipelineSearch:
         Type: "AWS::CodePipeline::Pipeline"
         Properties:
             Name: "cfz-photobot-lf2"
@@ -785,14 +775,14 @@ Resources:
                         Provider: "CodeBuild"
                         Version: "1"
                     Configuration: 
-                        ProjectName: !Ref CodeBuildProjectLf2
+                        ProjectName: !Ref CodeBuildProjectSearch
                     InputArtifacts: 
                       - 
                         Name: "SourceArtifact"
                     Region: !Ref AWS::Region
                     RunOrder: 1
 
-    CodePipelineWebhookLf2:
+    CodePipelineWebhookSearch:
         Type: "AWS::CodePipeline::Webhook"
         Properties:
             Authentication: "GITHUB_HMAC"
@@ -803,11 +793,11 @@ Resources:
               - 
                 JsonPath: "$.ref"
                 MatchEquals: refs/heads/{Branch}
-            TargetPipeline: !Ref CodePipelinePipelineLf2
+            TargetPipeline: !Ref CodePipelinePipelineSearch
             TargetAction: "Source"
-            TargetPipelineVersion: !GetAtt CodePipelinePipelineLf2.Version
+            TargetPipelineVersion: !GetAtt CodePipelinePipelineSearch.Version
 
-    CodeBuildProjectLf2:
+    CodeBuildProjectSearch:
         Type: "AWS::CodeBuild::Project"
         Properties:
             Name: "cfz-photobot-lf2-upload"
@@ -815,14 +805,12 @@ Resources:
             Source: 
                 BuildSpec: !Sub |
                     version: 0.2
-                    
                     phases:
                       build:
                         commands:
                           - ls
                           - zip -r package.zip .
-                          - aws lambda update-function-code --function-name arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${LambdaFunction} --zip-file fileb://package.zip
-                    
+                          - aws lambda update-function-code --function-name arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${LambdaFunctionSearch} --zip-file fileb://package.zip
                 InsecureSsl: false
                 Type: "CODEPIPELINE"
             Artifacts: 
@@ -976,7 +964,7 @@ Resources:
 
     # CloudFormation Resources
     #####################################
-    CloudFrontDistributionFrontend:
+    CloudFrontDistribution:
         Type: "AWS::CloudFront::Distribution"
         Properties:
             DistributionConfig: 
@@ -1022,7 +1010,7 @@ Resources:
 
     # IAM Resources
     #####################################
-    IAMRole:
+    IAMRoleApiGateway:
         Type: "AWS::IAM::Role"
         Properties:
             Path: "/"
@@ -1031,22 +1019,10 @@ Resources:
             MaxSessionDuration: 3600
             ManagedPolicyArns:
               - "arn:aws:iam::aws:policy/service-role/AmazonAPIGatewayPushToCloudWatchLogs"
-              - !Ref IAMManagedPolicy
+              - !Ref IAMManagedPolicyApiGateway
             Description: "Allows API Gateway to push logs to CloudWatch Logs and access S3, Lambda, etc."
 
-    IAMRole2:
-        Type: "AWS::IAM::Role"
-        Properties:
-            Path: "/"
-            RoleName: "cfzMyLambdaRole"
-            AssumeRolePolicyDocument: "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"lambda.amazonaws.com\"},\"Action\":\"sts:AssumeRole\"}]}"
-            MaxSessionDuration: 3600
-            ManagedPolicyArns:
-              - "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
-              - !Ref IAMManagedPolicy2
-            Description: "Allows Lambda functions to call AWS services on your behalf."
-
-    IAMManagedPolicy:
+    IAMManagedPolicyApiGateway:
         Type: "AWS::IAM::ManagedPolicy"
         Properties:
             ManagedPolicyName: "cfzMyApiGatewayPolicy"
@@ -1064,7 +1040,19 @@ Resources:
                     ]
                 }
 
-    IAMManagedPolicy2:
+    IAMRoleLambda:
+        Type: "AWS::IAM::Role"
+        Properties:
+            Path: "/"
+            RoleName: "cfzMyLambdaRole"
+            AssumeRolePolicyDocument: "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"lambda.amazonaws.com\"},\"Action\":\"sts:AssumeRole\"}]}"
+            MaxSessionDuration: 3600
+            ManagedPolicyArns:
+              - "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+              - !Ref IAMManagedPolicyLambda
+            Description: "Allows Lambda functions to call AWS services on your behalf."
+
+    IAMManagedPolicyLambda:
         Type: "AWS::IAM::ManagedPolicy"
         Properties:
             ManagedPolicyName: "cfzMyLambdaPolicy"
@@ -1098,7 +1086,6 @@ Resources:
                     ]
                 }
 
-
     IAMRoleLex:
         Type: "AWS::IAM::Role"
         Properties:
@@ -1107,38 +1094,6 @@ Resources:
             AssumeRolePolicyDocument: "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"lambda.amazonaws.com\"},\"Action\":\"sts:AssumeRole\"},{\"Sid\":\"Statement1\",\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"lexv2.amazonaws.com\"},\"Action\":\"sts:AssumeRole\"}]}"
             MaxSessionDuration: 3600
             Description: "Allows Lex V2 bots to call AWS services on your behalf."
-
-    IAMAccessKeyTranscribe:
-        Type: "AWS::IAM::AccessKey"
-        Properties:
-            Status: "Active"
-            UserName: !Ref IAMUserTranscribe
-
-    IAMUserTranscribe:
-        Type: "AWS::IAM::User"
-        Properties:
-            Path: "/"
-            UserName: "cfz-transcribe-user"
-            ManagedPolicyArns: 
-              - !Ref IAMManagedPolicyTranscribe
-
-    IAMManagedPolicyTranscribe:
-        Type: "AWS::IAM::ManagedPolicy"
-        Properties:
-            ManagedPolicyName: "cfzMyTranscribePolicy"
-            Path: "/"
-            PolicyDocument: |
-                {
-                    "Version": "2012-10-17",
-                    "Statement": [
-                        {
-                            "Sid": "VisualEditor0",
-                            "Effect": "Allow",
-                            "Action": "transcribe:StartStreamTranscriptionWebSocket",
-                            "Resource": "*"
-                        }
-                    ]
-                }
 
     IAMRoleCodePipeline:
         Type: "AWS::IAM::Role"
@@ -1396,8 +1351,8 @@ Resources:
                             "Resource": [
                                 "arn:aws:codebuild:${AWS::Region}:${AWS::AccountId}:report-group/cfz-photobot-lf1-upload-*",
                                 "arn:aws:codebuild:${AWS::Region}:${AWS::AccountId}:report-group/cfz-photobot-lf2-upload-*",
-                                "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${LambdaFunction}",
-                                "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${LambdaFunction2}",
+                                "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${LambdaFunctionSearch}",
+                                "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${LambdaFunctionUpload}",
                                 "arn:aws:s3:::codepipeline-${AWS::Region}-*",
                                 "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/cfz-photobot-lf1-upload",
                                 "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/cfz-photobot-lf1-upload:*",
@@ -1408,3 +1363,35 @@ Resources:
                     ],
                     "Version": "2012-10-17"
                 }
+
+    IAMUserTranscribe:
+        Type: "AWS::IAM::User"
+        Properties:
+            Path: "/"
+            UserName: "cfz-transcribe-user"
+            ManagedPolicyArns: 
+              - !Ref IAMManagedPolicyTranscribe
+
+    IAMManagedPolicyTranscribe:
+        Type: "AWS::IAM::ManagedPolicy"
+        Properties:
+            ManagedPolicyName: "cfzMyTranscribePolicy"
+            Path: "/"
+            PolicyDocument: |
+                {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Sid": "VisualEditor0",
+                            "Effect": "Allow",
+                            "Action": "transcribe:StartStreamTranscriptionWebSocket",
+                            "Resource": "*"
+                        }
+                    ]
+                }
+
+    IAMAccessKeyTranscribe:
+        Type: "AWS::IAM::AccessKey"
+        Properties:
+            Status: "Active"
+            UserName: !Ref IAMUserTranscribe
