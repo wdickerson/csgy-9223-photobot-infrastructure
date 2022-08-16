@@ -358,7 +358,6 @@ Resources:
             Bucket: !Ref S3BucketCodePipeline
             PolicyDocument: 
                 Version: "2012-10-17"
-                # Id: "SSEAndSSLPolicy"
                 Statement: 
                   - 
                     Sid: "DenyUnEncryptedObjectUploads"
@@ -398,7 +397,7 @@ Resources:
             MemorySize: 128
             Role: !GetAtt IAMRoleLambda.Arn
             Runtime: "python3.7"
-            Timeout: 3
+            Timeout: 10
             TracingConfig: 
                 Mode: "PassThrough"
             EphemeralStorage: 
@@ -546,9 +545,6 @@ Resources:
                     Namespace: "DeployVariables"
                     RunOrder: 1
 
-    # 'GithubWebhook' satisfies two requirements:
-    # -- Means that updates are pushed from GitHub, rather than AWS having to poll
-    # -- Means we can filter for required changes
     CodePipelineWebhookFrontend:
         Type: "AWS::CodePipeline::Webhook"
         Properties:
@@ -1118,161 +1114,44 @@ Resources:
                 {
                     "Statement": [
                         {
-                            "Action": [
-                                "iam:PassRole"
-                            ],
-                            "Resource": "*",
                             "Effect": "Allow",
-                            "Condition": {
-                                "StringEqualsIfExists": {
-                                    "iam:PassedToService": [
-                                        "cloudformation.amazonaws.com",
-                                        "elasticbeanstalk.amazonaws.com",
-                                        "ec2.amazonaws.com",
-                                        "ecs-tasks.amazonaws.com"
-                                    ]
-                                }
-                            }
-                        },
-                        {
                             "Action": [
-                                "codedeploy:CreateDeployment",
-                                "codedeploy:GetApplication",
-                                "codedeploy:GetApplicationRevision",
-                                "codedeploy:GetDeployment",
-                                "codedeploy:GetDeploymentConfig",
-                                "codedeploy:RegisterApplicationRevision"
-                            ],
-                            "Resource": "*",
-                            "Effect": "Allow"
-                        },
-                        {
-                            "Action": [
-                                "elasticbeanstalk:*",
-                                "ec2:*",
-                                "elasticloadbalancing:*",
-                                "autoscaling:*",
-                                "cloudwatch:*",
-                                "s3:*",
-                                "sns:*",
-                                "cloudformation:*",
-                                "rds:*",
-                                "sqs:*",
-                                "ecs:*"
-                            ],
-                            "Resource": "*",
-                            "Effect": "Allow"
-                        },
-                        {
-                            "Action": [
-                                "lambda:InvokeFunction",
-                                "lambda:ListFunctions"
-                            ],
-                            "Resource": "*",
-                            "Effect": "Allow"
-                        },
-                        {
-                            "Action": [
+                                "lambda:UpdateFunctionCode",
+                                "s3:PutObject",
+                                "s3:GetObject",
+                                "s3:GetObjectVersion",
+                                "s3:GetBucketAcl",
+                                "s3:GetBucketLocation",
+                                "logs:CreateLogGroup",
+                                "logs:CreateLogStream",
+                                "logs:PutLogEvents",
+                                "codebuild:CreateReportGroup",
+                                "codebuild:CreateReport",
+                                "codebuild:UpdateReport",
+                                "codebuild:BatchPutTestCases",
+                                "codebuild:BatchPutCodeCoverages",
                                 "codebuild:BatchGetBuilds",
                                 "codebuild:StartBuild",
                                 "codebuild:BatchGetBuildBatches",
-                                "codebuild:StartBuildBatch"
+                                "codebuild:StartBuildBatch"                            
                             ],
-                            "Resource": "*",
-                            "Effect": "Allow"
-                        },
-                        {
-                            "Effect": "Allow",
-                            "Action": [
-                                "servicecatalog:ListProvisioningArtifacts",
-                                "servicecatalog:CreateProvisioningArtifact",
-                                "servicecatalog:DescribeProvisioningArtifact",
-                                "servicecatalog:DeleteProvisioningArtifact",
-                                "servicecatalog:UpdateProduct"
-                            ],
-                            "Resource": "*"
-                        },
-                        {
-                            "Effect": "Allow",
-                            "Action": [
-                                "cloudformation:ValidateTemplate"
-                            ],
-                            "Resource": "*"
-                        },
-                        {
-                            "Effect": "Allow",
-                            "Action": [
-                                "ecr:DescribeImages"
-                            ],
-                            "Resource": "*"
-                        },
-                        {
-                            "Effect": "Allow",
-                            "Action": [
-                                "states:DescribeExecution",
-                                "states:DescribeStateMachine",
-                                "states:StartExecution"
-                            ],
-                            "Resource": "*"
-                        },
-                        {
-                            "Effect": "Allow",
                             "Resource": [
+                                "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${LambdaFunctionSearch}",
+                                "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${LambdaFunctionUpload}",
+                                "arn:aws:s3:::*cfz-codepipeline-${AWS::Region}-*",
+                                "arn:aws:s3:::*cfz-wad-csgy-9223-photobot-frontend*",
                                 "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/cfz-photobot-frontend-build",
                                 "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/cfz-photobot-frontend-build:*",
                                 "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/cfz-photobot-lf1-upload",
                                 "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/cfz-photobot-lf1-upload:*",
                                 "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/cfz-photobot-lf2-upload",
-                                "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/cfz-photobot-lf2-upload:*"
-                            ],
-                            "Action": [
-                                "logs:CreateLogGroup",
-                                "logs:CreateLogStream",
-                                "logs:PutLogEvents"
-                            ]
-                        },
-                        {
-                            "Effect": "Allow",
-                            "Resource": [
-                                "arn:aws:s3:::cfz-codepipeline-${AWS::Region}-*"
-                            ],
-                            "Action": [
-                                "s3:PutObject",
-                                "s3:GetObject",
-                                "s3:GetObjectVersion",
-                                "s3:GetBucketAcl",
-                                "s3:GetBucketLocation"
-                            ]
-                        },
-                        {
-                            "Effect": "Allow",
-                            "Action": [
-                                "codebuild:CreateReportGroup",
-                                "codebuild:CreateReport",
-                                "codebuild:UpdateReport",
-                                "codebuild:BatchPutTestCases",
-                                "codebuild:BatchPutCodeCoverages"
-                            ],
-                            "Resource": [
+                                "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/cfz-photobot-lf2-upload:*",
                                 "arn:aws:codebuild:${AWS::Region}:${AWS::AccountId}:report-group/cfz-photobot-lf1-upload-*",
                                 "arn:aws:codebuild:${AWS::Region}:${AWS::AccountId}:report-group/cfz-photobot-lf2-upload-*",
-                                "arn:aws:codebuild:${AWS::Region}:${AWS::AccountId}:report-group/cfz-photobot-frontend-build-*"
-                            ]
-                        },
-                        {
-                            "Sid": "VisualEditor0",
-                            "Effect": "Allow",
-                            "Action": [
-                                "s3:GetBucketAcl",
-                                "lambda:UpdateFunctionCode",
-                                "s3:PutObject",
-                                "s3:GetObject",
-                                "s3:GetBucketLocation",
-                                "s3:GetObjectVersion"
-                            ],
-                            "Resource": [
-                                "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${LambdaFunctionSearch}",
-                                "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${LambdaFunctionUpload}"
+                                "arn:aws:codebuild:${AWS::Region}:${AWS::AccountId}:report-group/cfz-photobot-frontend-build-*",
+                                "arn:aws:codebuild:${AWS::Region}:${AWS::AccountId}:project/cfz-photobot-frontend-build",
+                                "arn:aws:codebuild:${AWS::Region}:${AWS::AccountId}:project/cfz-photobot-lf1-upload",
+                                "arn:aws:codebuild:${AWS::Region}:${AWS::AccountId}:project/cfz-photobot-lf2-upload"
                             ]
                         }
                     ],
@@ -1297,7 +1176,6 @@ Resources:
                     "Version": "2012-10-17",
                     "Statement": [
                         {
-                            "Sid": "VisualEditor0",
                             "Effect": "Allow",
                             "Action": "transcribe:StartStreamTranscriptionWebSocket",
                             "Resource": "*"
@@ -1310,3 +1188,46 @@ Resources:
         Properties:
             Status: "Active"
             UserName: !Ref IAMUserTranscribe
+
+
+                        # {
+                        #     "Action": [
+                        #         "codebuild:BatchGetBuilds",
+                        #         "codebuild:StartBuild",
+                        #         "codebuild:BatchGetBuildBatches",
+                        #         "codebuild:StartBuildBatch"
+                        #     ],
+                        #     "Resource": "*",
+                        #     "Effect": "Allow"
+                        # },
+
+                        # {
+                        #     "Action": [
+                        #         "codedeploy:CreateDeployment",
+                        #         "codedeploy:GetApplication",
+                        #         "codedeploy:GetApplicationRevision",
+                        #         "codedeploy:GetDeployment",
+                        #         "codedeploy:GetDeploymentConfig",
+                        #         "codedeploy:RegisterApplicationRevision"
+                        #     ],
+                        #     "Resource": "*",
+                        #     "Effect": "Allow"
+                        # },
+
+                        # {
+                        #     "Action": [
+                        #         "iam:PassRole"
+                        #     ],
+                        #     "Resource": "*",
+                        #     "Effect": "Allow",
+                        #     "Condition": {
+                        #         "StringEqualsIfExists": {
+                        #             "iam:PassedToService": [
+                        #                 "cloudformation.amazonaws.com",
+                        #                 "elasticbeanstalk.amazonaws.com",
+                        #                 "ec2.amazonaws.com",
+                        #                 "ecs-tasks.amazonaws.com"
+                        #             ]
+                        #         }
+                        #     }
+                        # },
