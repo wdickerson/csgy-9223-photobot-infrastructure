@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: "2010-09-09"
-Description: ""
+Description: "A photo album app with NLU and image recognition"
 Outputs:
     ApiHost:
         Value: !Sub "https://${ApiGatewayRestApi}.execute-api.${AWS::Region}.amazonaws.com/${ApiGatewayStage}"
@@ -15,7 +15,7 @@ Resources:
     ApiGatewayRestApi:
         Type: "AWS::ApiGateway::RestApi"
         Properties:
-            Name: "cfz-photobot-api"
+            Name: "cfx-photobot-api"
             Description: "AI Photo Search application, built during the Cloud and Big Data course at Columbia University."
             ApiKeySourceType: "HEADER"
             BinaryMediaTypes:
@@ -30,14 +30,14 @@ Resources:
             StageName: "dev"
             DeploymentId: !Ref ApiGatewayDeployment
             RestApiId: !Ref ApiGatewayRestApi
-            CacheClusterEnabled: false
-            TracingEnabled: false
 
     ApiGatewayDeployment:
         Type: "AWS::ApiGateway::Deployment"
         DependsOn:
             - "ApiGatewayMethodGet"
             - "ApiGatewayMethodPut"
+            - "ApiGatewayMethodOptionsSearch"
+            - "ApiGatewayMethodOptionsPut"
         Properties:
             RestApiId: !Ref ApiGatewayRestApi
 
@@ -84,7 +84,6 @@ Resources:
                 ResponseParameters: {}
                 StatusCode: "500"
             Integration:
-                CacheNamespace: !Ref ApiGatewayResourceSearch
                 ContentHandling: "CONVERT_TO_TEXT"
                 IntegrationHttpMethod: "POST"
                 IntegrationResponses:
@@ -116,7 +115,6 @@ Resources:
                     "method.response.header.Access-Control-Allow-Origin": false
                 StatusCode: "200"
             Integration: 
-                CacheNamespace: !Ref ApiGatewayResourceSearch
                 IntegrationResponses: 
                   - 
                     ResponseParameters: 
@@ -160,7 +158,6 @@ Resources:
                 ResponseParameters: {}
                 StatusCode: "500"
             Integration:
-                CacheNamespace: !Ref ApiGatewayResourceUpload
                 Credentials: !GetAtt IAMRoleApiGateway.Arn
                 IntegrationHttpMethod: "PUT"
                 IntegrationResponses:
@@ -196,7 +193,6 @@ Resources:
                     "method.response.header.Access-Control-Allow-Origin": false
                 StatusCode: "200"
             Integration: 
-                CacheNamespace: !Ref ApiGatewayResourceUpload
                 IntegrationResponses: 
                   - 
                     ResponseParameters: 
@@ -215,7 +211,7 @@ Resources:
         Type: "AWS::ApiGateway::Model"
         Properties:
             RestApiId: !Ref ApiGatewayRestApi
-            Name: "cfzPhoto"
+            Name: "cfxPhoto"
             Schema: |
                 {
                   "type" : "object",
@@ -231,27 +227,25 @@ Resources:
                     }
                   }
                 }
-
             ContentType: "application/json"
 
     ApiGatewayModelGeneric:
         Type: "AWS::ApiGateway::Model"
         Properties:
             RestApiId: !Ref ApiGatewayRestApi
-            Name: "cfzGenericResponse"
+            Name: "cfxGenericResponse"
             Schema: |
                 {
                   "type" : "object",
                   "properties" : { }
                 }
-
             ContentType: "application/json"
 
     ApiGatewayModelSearchResponse:
         Type: "AWS::ApiGateway::Model"
         Properties:
             RestApiId: !Ref ApiGatewayRestApi
-            Name: "cfzSearchResponse"
+            Name: "cfxSearchResponse"
             Schema: !Sub |
                 {
                   "type" : "object",
@@ -264,14 +258,13 @@ Resources:
                     }
                   }
                 }
-
             ContentType: "application/json"
 
     ApiGatewayModelError:
         Type: "AWS::ApiGateway::Model"
         Properties:
             RestApiId: !Ref ApiGatewayRestApi
-            Name: "cfzError"
+            Name: "cfxError"
             Schema: |
                 {
                   "type" : "object",
@@ -295,7 +288,7 @@ Resources:
             - "LambdaFunctionUpload"
             - "LambdaPermissionUpload"
         Properties:
-            BucketName: "cfz-wad-csgy-9223-photobot-store"
+            BucketName: "cfx-wad-csgy-9223-photobot-store"
             NotificationConfiguration: 
                 LambdaConfigurations: 
                   - 
@@ -329,7 +322,7 @@ Resources:
     S3BucketFrontend:
         Type: "AWS::S3::Bucket"
         Properties:
-            BucketName: "cfz-wad-csgy-9223-photobot-frontend"
+            BucketName: "cfx-wad-csgy-9223-photobot-frontend"
             WebsiteConfiguration: 
                 IndexDocument: "index.html"
 
@@ -350,7 +343,7 @@ Resources:
     S3BucketCodePipeline:
         Type: "AWS::S3::Bucket"
         Properties:
-            BucketName: !Sub "cfz-codepipeline-${AWS::Region}-260380406818"
+            BucketName: !Sub "cfx-codepipeline-${AWS::Region}-260380406818"
 
     S3BucketPolicyCodePipeline:
         Type: "AWS::S3::BucketPolicy"
@@ -384,7 +377,7 @@ Resources:
         Type: "AWS::Lambda::Function"
         Properties:
             Description: ""
-            FunctionName: "cfz-photobot-lf1"
+            FunctionName: "cfx-photobot-lf1"
             Handler: "index.lambda_handler"
             Architectures: 
               - "x86_64"
@@ -409,13 +402,13 @@ Resources:
             Action: "lambda:InvokeFunction"
             FunctionName: !GetAtt LambdaFunctionUpload.Arn
             Principal: "s3.amazonaws.com"
-            SourceArn: "arn:aws:s3:::*cfz-wad-csgy-9223-photobot-store*"
+            SourceArn: "arn:aws:s3:::*cfx-wad-csgy-9223-photobot-store*"
 
     LambdaFunctionSearch:
         Type: "AWS::Lambda::Function"
         Properties:
             Description: ""
-            FunctionName: "cfz-photobot-lf2"
+            FunctionName: "cfx-photobot-lf2"
             Handler: "index.lambda_handler"
             Architectures:
               - "x86_64"
@@ -450,7 +443,7 @@ Resources:
     OpenSearchServiceDomain:
         Type: "AWS::OpenSearchService::Domain"
         Properties:
-            DomainName: "cfz-photobot-es"
+            DomainName: "cfx-photobot-es"
             EngineVersion: "OpenSearch_1.3"
             ClusterConfig:
                 InstanceCount: 2
@@ -463,20 +456,19 @@ Resources:
                         Principal:
                             AWS: !GetAtt IAMRoleLambda.Arn
                         Action: "es:*"
-                        Resource: !Sub "arn:aws:es:${AWS::Region}:${AWS::AccountId}:domain/cfz-photobot-es/*"
+                        Resource: !Sub "arn:aws:es:${AWS::Region}:${AWS::AccountId}:domain/cfx-photobot-es/*"
             EBSOptions:
                 EBSEnabled: true
                 VolumeType: "gp3"
                 VolumeSize: 10
                 Iops: 3000
 
-
     # CodePipeline Resources
     ##################################
     CodePipelinePipelineFrontend:
         Type: "AWS::CodePipeline::Pipeline"
         Properties:
-            Name: "cfz-photobot-frontend"
+            Name: "cfx-photobot-frontend"
             RoleArn: !GetAtt IAMRoleCodePipeline.Arn
             ArtifactStore: 
                 Location: !Ref S3BucketCodePipeline
@@ -563,11 +555,10 @@ Resources:
     CodeBuildProjectFrontend:
         Type: "AWS::CodeBuild::Project"
         Properties:
-            Name: "cfz-photobot-frontend-build"
+            Name: "cfx-photobot-frontend-build"
             Source: 
                 BuildSpec: !Sub |
                     version: 0.2
-
                     phases:
                         install:
                             runtime-versions:
@@ -581,12 +572,11 @@ Resources:
                         files:
                             - '**/*'
                         base-directory: build
-
                 InsecureSsl: false
                 Type: "CODEPIPELINE"
             Artifacts: 
                 EncryptionDisabled: false
-                Name: "cfz-photobot-frontend-build"
+                Name: "cfx-photobot-frontend-build"
                 Packaging: "NONE"
                 Type: "CODEPIPELINE"
             Cache: 
@@ -613,20 +603,14 @@ Resources:
             ServiceRole: !GetAtt IAMRoleCodeBuild.Arn
             TimeoutInMinutes: 60
             QueuedTimeoutInMinutes: 480
-            EncryptionKey: !Sub "arn:aws:kms:${AWS::Region}:${AWS::AccountId}:alias/aws/s3"
-            BadgeEnabled: false
             LogsConfig: 
                 CloudWatchLogs: 
                     Status: "ENABLED"
-                S3Logs: 
-                    Status: "DISABLED"
-                    EncryptionDisabled: false
-            Visibility: "PRIVATE"
 
     CodePipelinePipelineUpload:
         Type: "AWS::CodePipeline::Pipeline"
         Properties:
-            Name: "cfz-photobot-lf1"
+            Name: "cfx-photobot-lf1"
             RoleArn: !GetAtt IAMRoleCodePipeline.Arn
             ArtifactStore: 
                 Location: !Ref S3BucketCodePipeline
@@ -690,7 +674,7 @@ Resources:
     CodeBuildProjectUpload:
         Type: "AWS::CodeBuild::Project"
         Properties:
-            Name: "cfz-photobot-lf1-upload"
+            Name: "cfx-photobot-lf1-upload"
             Description: "Just upload a zip file to lambda"
             Source: 
                 BuildSpec: !Sub |
@@ -705,7 +689,7 @@ Resources:
                 Type: "CODEPIPELINE"
             Artifacts: 
                 EncryptionDisabled: false
-                Name: "cfz-photobot-lf1-upload"
+                Name: "cfx-photobot-lf1-upload"
                 Packaging: "NONE"
                 Type: "CODEPIPELINE"
             Cache: 
@@ -719,20 +703,14 @@ Resources:
             ServiceRole: !GetAtt IAMRoleCodeBuild.Arn
             TimeoutInMinutes: 60
             QueuedTimeoutInMinutes: 480
-            EncryptionKey: !Sub "arn:aws:kms:${AWS::Region}:${AWS::AccountId}:alias/aws/s3"
-            BadgeEnabled: false
             LogsConfig: 
                 CloudWatchLogs: 
                     Status: "ENABLED"
-                S3Logs: 
-                    Status: "DISABLED"
-                    EncryptionDisabled: false
-            Visibility: "PRIVATE"
 
     CodePipelinePipelineSearch:
         Type: "AWS::CodePipeline::Pipeline"
         Properties:
-            Name: "cfz-photobot-lf2"
+            Name: "cfx-photobot-lf2"
             RoleArn: !GetAtt IAMRoleCodePipeline.Arn
             ArtifactStore: 
                 Location: !Ref S3BucketCodePipeline
@@ -796,7 +774,7 @@ Resources:
     CodeBuildProjectSearch:
         Type: "AWS::CodeBuild::Project"
         Properties:
-            Name: "cfz-photobot-lf2-upload"
+            Name: "cfx-photobot-lf2-upload"
             Description: "Just upload a zip file to lambda"
             Source: 
                 BuildSpec: !Sub |
@@ -811,7 +789,7 @@ Resources:
                 Type: "CODEPIPELINE"
             Artifacts: 
                 EncryptionDisabled: false
-                Name: "cfz-photobot-lf2-upload"
+                Name: "cfx-photobot-lf2-upload"
                 Packaging: "NONE"
                 Type: "CODEPIPELINE"
             Cache: 
@@ -825,22 +803,16 @@ Resources:
             ServiceRole: !GetAtt IAMRoleCodeBuild.Arn
             TimeoutInMinutes: 60
             QueuedTimeoutInMinutes: 480
-            EncryptionKey: !Sub "arn:aws:kms:${AWS::Region}:${AWS::AccountId}:alias/aws/s3"
-            BadgeEnabled: false
             LogsConfig: 
                 CloudWatchLogs: 
                     Status: "ENABLED"
-                S3Logs: 
-                    Status: "DISABLED"
-                    EncryptionDisabled: false
-            Visibility: "PRIVATE"
 
     # Lex Resources
     #####################################
     LexBot:
         Type: AWS::Lex::Bot
         Properties:
-            Name: "cfzPhotobot"
+            Name: "cfxPhotobot"
             RoleArn: !GetAtt IAMRoleLex.Arn
             DataPrivacy:
                 ChildDirected: false
@@ -951,7 +923,7 @@ Resources:
         Type: AWS::Lex::BotAlias
         Properties:
             BotId: !Ref LexBot
-            BotAliasName: "cfzPhotobotAlias"
+            BotAliasName: "cfxPhotobotAlias"
             BotAliasLocaleSettings:
               - LocaleId: en_US
                 BotAliasLocaleSetting:
@@ -970,18 +942,13 @@ Resources:
                     ConnectionTimeout: 10
                     DomainName: !Sub "${S3BucketFrontend}.s3.${AWS::Region}.amazonaws.com"
                     Id: !Sub "${S3BucketFrontend}.s3.${AWS::Region}.amazonaws.com"
-                    OriginPath: ""
-                    S3OriginConfig: 
-                        OriginAccessIdentity: ""
+                    CustomOriginConfig:
+                        OriginProtocolPolicy: "http-only"
                 DefaultCacheBehavior: 
                     AllowedMethods: 
                       - "HEAD"
-                      - "DELETE"
-                      - "POST"
                       - "GET"
                       - "OPTIONS"
-                      - "PUT"
-                      - "PATCH"
                     CachedMethods: 
                       - "HEAD"
                       - "GET"
@@ -991,18 +958,9 @@ Resources:
                     SmoothStreaming: false
                     TargetOriginId: !Sub "${S3BucketFrontend}.s3.${AWS::Region}.amazonaws.com"
                     ViewerProtocolPolicy: "redirect-to-https"
-                Comment: ""
                 PriceClass: "PriceClass_100"
                 Enabled: true
-                ViewerCertificate: 
-                    CloudFrontDefaultCertificate: true
-                    # MinimumProtocolVersion: "TLSv1"
-                Restrictions: 
-                    GeoRestriction: 
-                        RestrictionType: "none"
-                HttpVersion: "http2"
                 DefaultRootObject: "index.html"
-                IPV6Enabled: false
 
     # IAM Resources
     #####################################
@@ -1010,7 +968,7 @@ Resources:
         Type: "AWS::IAM::Role"
         Properties:
             Path: "/"
-            RoleName: "cfzMyApiGatewayRole"
+            RoleName: "cfxMyApiGatewayRole"
             AssumeRolePolicyDocument: "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Sid\":\"\",\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"apigateway.amazonaws.com\"},\"Action\":\"sts:AssumeRole\"}]}"
             MaxSessionDuration: 3600
             ManagedPolicyArns:
@@ -1021,7 +979,7 @@ Resources:
     IAMManagedPolicyApiGateway:
         Type: "AWS::IAM::ManagedPolicy"
         Properties:
-            ManagedPolicyName: "cfzMyApiGatewayPolicy"
+            ManagedPolicyName: "cfxMyApiGatewayPolicy"
             Path: "/"
             PolicyDocument: !Sub |
                 {
@@ -1030,7 +988,7 @@ Resources:
                         {
                             "Effect": "Allow",
                             "Action": "s3:PutObject",
-                            "Resource": "arn:aws:s3:::*cfz-wad-csgy-9223-photobot-store*/*"
+                            "Resource": "arn:aws:s3:::*cfx-wad-csgy-9223-photobot-store*/*"
                         }
                     ]
                 }
@@ -1039,7 +997,7 @@ Resources:
         Type: "AWS::IAM::Role"
         Properties:
             Path: "/"
-            RoleName: "cfzMyLambdaRole"
+            RoleName: "cfxMyLambdaRole"
             AssumeRolePolicyDocument: "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"lambda.amazonaws.com\"},\"Action\":\"sts:AssumeRole\"}]}"
             MaxSessionDuration: 3600
             ManagedPolicyArns:
@@ -1050,7 +1008,7 @@ Resources:
     IAMManagedPolicyLambda:
         Type: "AWS::IAM::ManagedPolicy"
         Properties:
-            ManagedPolicyName: "cfzMyLambdaPolicy"
+            ManagedPolicyName: "cfxMyLambdaPolicy"
             Path: "/"
             PolicyDocument: !Sub |
                 {
@@ -1070,7 +1028,7 @@ Resources:
                             ],
                             "Resource": [
                                 "arn:aws:lex:*:${AWS::AccountId}:bot-alias/*/*",
-                                "arn:aws:s3:::*cfz-wad-csgy-9223-photobot-store*/*"
+                                "arn:aws:s3:::*cfx-wad-csgy-9223-photobot-store*/*"
                             ]
                         }
                     ]
@@ -1080,7 +1038,7 @@ Resources:
         Type: "AWS::IAM::Role"
         Properties:
             Path: "/"
-            RoleName: "cfzMyLexRole"
+            RoleName: "cfxMyLexRole"
             AssumeRolePolicyDocument: "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"lambda.amazonaws.com\"},\"Action\":\"sts:AssumeRole\"},{\"Sid\":\"Statement1\",\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"lexv2.amazonaws.com\"},\"Action\":\"sts:AssumeRole\"}]}"
             MaxSessionDuration: 3600
             Description: "Allows Lex V2 bots to call AWS services on your behalf."
@@ -1089,7 +1047,7 @@ Resources:
         Type: "AWS::IAM::Role"
         Properties:
             Path: "/service-role/"
-            RoleName: "cfzMyPhotobotCodePipelineRole"
+            RoleName: "cfxMyPhotobotCodePipelineRole"
             AssumeRolePolicyDocument: "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"codepipeline.amazonaws.com\"},\"Action\":\"sts:AssumeRole\"}]}"
             MaxSessionDuration: 3600
             ManagedPolicyArns: 
@@ -1099,7 +1057,7 @@ Resources:
         Type: "AWS::IAM::Role"
         Properties:
             Path: "/service-role/"
-            RoleName: "cfzMyPhotobotCodeBuildRole"
+            RoleName: "cfxMyPhotobotCodeBuildRole"
             AssumeRolePolicyDocument: "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"codebuild.amazonaws.com\"},\"Action\":\"sts:AssumeRole\"}]}"
             MaxSessionDuration: 3600
             ManagedPolicyArns: 
@@ -1108,7 +1066,7 @@ Resources:
     IAMManagedPolicyCodePipelineAndBuild:
         Type: "AWS::IAM::ManagedPolicy"
         Properties:
-            ManagedPolicyName: !Sub "cfzCodeBuildBasePolicy-photobot-build-${AWS::Region}"
+            ManagedPolicyName: !Sub "cfxMyCodeBuildBasePolicy-photobot-build-${AWS::Region}"
             Path: "/service-role/"
             PolicyDocument: !Sub |
                 {
@@ -1138,20 +1096,20 @@ Resources:
                             "Resource": [
                                 "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${LambdaFunctionSearch}",
                                 "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${LambdaFunctionUpload}",
-                                "arn:aws:s3:::*cfz-codepipeline-${AWS::Region}-*",
-                                "arn:aws:s3:::*cfz-wad-csgy-9223-photobot-frontend*",
-                                "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/cfz-photobot-frontend-build",
-                                "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/cfz-photobot-frontend-build:*",
-                                "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/cfz-photobot-lf1-upload",
-                                "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/cfz-photobot-lf1-upload:*",
-                                "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/cfz-photobot-lf2-upload",
-                                "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/cfz-photobot-lf2-upload:*",
-                                "arn:aws:codebuild:${AWS::Region}:${AWS::AccountId}:report-group/cfz-photobot-lf1-upload-*",
-                                "arn:aws:codebuild:${AWS::Region}:${AWS::AccountId}:report-group/cfz-photobot-lf2-upload-*",
-                                "arn:aws:codebuild:${AWS::Region}:${AWS::AccountId}:report-group/cfz-photobot-frontend-build-*",
-                                "arn:aws:codebuild:${AWS::Region}:${AWS::AccountId}:project/cfz-photobot-frontend-build",
-                                "arn:aws:codebuild:${AWS::Region}:${AWS::AccountId}:project/cfz-photobot-lf1-upload",
-                                "arn:aws:codebuild:${AWS::Region}:${AWS::AccountId}:project/cfz-photobot-lf2-upload"
+                                "arn:aws:s3:::*cfx-codepipeline-${AWS::Region}-*",
+                                "arn:aws:s3:::*cfx-wad-csgy-9223-photobot-frontend*",
+                                "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/cfx-photobot-frontend-build",
+                                "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/cfx-photobot-frontend-build:*",
+                                "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/cfx-photobot-lf1-upload",
+                                "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/cfx-photobot-lf1-upload:*",
+                                "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/cfx-photobot-lf2-upload",
+                                "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/cfx-photobot-lf2-upload:*",
+                                "arn:aws:codebuild:${AWS::Region}:${AWS::AccountId}:report-group/cfx-photobot-lf1-upload-*",
+                                "arn:aws:codebuild:${AWS::Region}:${AWS::AccountId}:report-group/cfx-photobot-lf2-upload-*",
+                                "arn:aws:codebuild:${AWS::Region}:${AWS::AccountId}:report-group/cfx-photobot-frontend-build-*",
+                                "arn:aws:codebuild:${AWS::Region}:${AWS::AccountId}:project/cfx-photobot-frontend-build",
+                                "arn:aws:codebuild:${AWS::Region}:${AWS::AccountId}:project/cfx-photobot-lf1-upload",
+                                "arn:aws:codebuild:${AWS::Region}:${AWS::AccountId}:project/cfx-photobot-lf2-upload"
                             ]
                         }
                     ],
@@ -1162,14 +1120,14 @@ Resources:
         Type: "AWS::IAM::User"
         Properties:
             Path: "/"
-            UserName: "cfz-transcribe-user"
+            UserName: "cfx-transcribe-user"
             ManagedPolicyArns: 
               - !Ref IAMManagedPolicyTranscribe
 
     IAMManagedPolicyTranscribe:
         Type: "AWS::IAM::ManagedPolicy"
         Properties:
-            ManagedPolicyName: "cfzMyTranscribePolicy"
+            ManagedPolicyName: "cfxMyTranscribePolicy"
             Path: "/"
             PolicyDocument: |
                 {
@@ -1188,46 +1146,3 @@ Resources:
         Properties:
             Status: "Active"
             UserName: !Ref IAMUserTranscribe
-
-
-                        # {
-                        #     "Action": [
-                        #         "codebuild:BatchGetBuilds",
-                        #         "codebuild:StartBuild",
-                        #         "codebuild:BatchGetBuildBatches",
-                        #         "codebuild:StartBuildBatch"
-                        #     ],
-                        #     "Resource": "*",
-                        #     "Effect": "Allow"
-                        # },
-
-                        # {
-                        #     "Action": [
-                        #         "codedeploy:CreateDeployment",
-                        #         "codedeploy:GetApplication",
-                        #         "codedeploy:GetApplicationRevision",
-                        #         "codedeploy:GetDeployment",
-                        #         "codedeploy:GetDeploymentConfig",
-                        #         "codedeploy:RegisterApplicationRevision"
-                        #     ],
-                        #     "Resource": "*",
-                        #     "Effect": "Allow"
-                        # },
-
-                        # {
-                        #     "Action": [
-                        #         "iam:PassRole"
-                        #     ],
-                        #     "Resource": "*",
-                        #     "Effect": "Allow",
-                        #     "Condition": {
-                        #         "StringEqualsIfExists": {
-                        #             "iam:PassedToService": [
-                        #                 "cloudformation.amazonaws.com",
-                        #                 "elasticbeanstalk.amazonaws.com",
-                        #                 "ec2.amazonaws.com",
-                        #                 "ecs-tasks.amazonaws.com"
-                        #             ]
-                        #         }
-                        #     }
-                        # },

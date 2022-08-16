@@ -1,13 +1,12 @@
 AWSTemplateFormatVersion: "2010-09-09"
-Description: "Just Opensearch"
+Description: "A subset of resources for photobot"
 Resources:
-
     # OpenSearch Resources
     ###############################
     OpenSearchServiceDomain:
         Type: "AWS::OpenSearchService::Domain"
         Properties:
-            DomainName: "cfz-photobot-es"
+            DomainName: "cfy-photobot-es"
             EngineVersion: "OpenSearch_1.3"
             ClusterConfig:
                 InstanceCount: 2
@@ -20,22 +19,19 @@ Resources:
                         Principal:
                             AWS: !GetAtt IAMRoleLambda.Arn
                         Action: "es:*"
-                        Resource: !Sub "arn:aws:es:${AWS::Region}:${AWS::AccountId}:domain/cfz-photobot-es/*"
+                        Resource: !Sub "arn:aws:es:${AWS::Region}:${AWS::AccountId}:domain/cfy-photobot-es/*"
             EBSOptions:
                 EBSEnabled: true
                 VolumeType: "gp3"
                 VolumeSize: 10
                 Iops: 3000
 
-
-
-
     # Lex Resources
     #####################################
     LexBot:
         Type: AWS::Lex::Bot
         Properties:
-            Name: "cfzPhotobot"
+            Name: "cfyPhotobot"
             RoleArn: !GetAtt IAMRoleLex.Arn
             DataPrivacy:
                 ChildDirected: false
@@ -146,7 +142,7 @@ Resources:
         Type: AWS::Lex::BotAlias
         Properties:
             BotId: !Ref LexBot
-            BotAliasName: "cfzPhotobotAlias"
+            BotAliasName: "cfyPhotobotAlias"
             BotAliasLocaleSettings:
               - LocaleId: en_US
                 BotAliasLocaleSetting:
@@ -159,7 +155,7 @@ Resources:
         Type: "AWS::IAM::Role"
         Properties:
             Path: "/"
-            RoleName: "cfzMyApiGatewayRole"
+            RoleName: "cfyMyApiGatewayRole"
             AssumeRolePolicyDocument: "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Sid\":\"\",\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"apigateway.amazonaws.com\"},\"Action\":\"sts:AssumeRole\"}]}"
             MaxSessionDuration: 3600
             ManagedPolicyArns:
@@ -170,17 +166,16 @@ Resources:
     IAMManagedPolicyApiGateway:
         Type: "AWS::IAM::ManagedPolicy"
         Properties:
-            ManagedPolicyName: "cfzMyApiGatewayPolicy"
+            ManagedPolicyName: "cfyMyApiGatewayPolicy"
             Path: "/"
             PolicyDocument: !Sub |
                 {
                     "Version": "2012-10-17",
                     "Statement": [
                         {
-                            "Sid": "VisualEditor0",
                             "Effect": "Allow",
                             "Action": "s3:PutObject",
-                            "Resource": "arn:aws:s3:::*cfz-wad-csgy-9223-photobot-store*/*"
+                            "Resource": "arn:aws:s3:::*cfy-wad-csgy-9223-photobot-store*/*"
                         }
                     ]
                 }
@@ -189,7 +184,7 @@ Resources:
         Type: "AWS::IAM::Role"
         Properties:
             Path: "/"
-            RoleName: "cfzMyLambdaRole"
+            RoleName: "cfyMyLambdaRole"
             AssumeRolePolicyDocument: "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"lambda.amazonaws.com\"},\"Action\":\"sts:AssumeRole\"}]}"
             MaxSessionDuration: 3600
             ManagedPolicyArns:
@@ -200,32 +195,27 @@ Resources:
     IAMManagedPolicyLambda:
         Type: "AWS::IAM::ManagedPolicy"
         Properties:
-            ManagedPolicyName: "cfzMyLambdaPolicy"
+            ManagedPolicyName: "cfyMyLambdaPolicy"
             Path: "/"
             PolicyDocument: !Sub |
                 {
                     "Version": "2012-10-17",
                     "Statement": [
                         {
-                            "Sid": "VisualEditor1",
                             "Effect": "Allow",
                             "Action": "rekognition:*",
                             "Resource": "*"
                         },
                         {
-                            "Sid": "VisualEditor0",
                             "Effect": "Allow",
                             "Action": [
                                 "lex:RecognizeText",
-                                "lex:PutSession",
-                                "lex:StartConversation",
-                                "lex:RecognizeUtterance",
                                 "s3:GetObject",
                                 "s3:ListBucket"
                             ],
                             "Resource": [
                                 "arn:aws:lex:*:${AWS::AccountId}:bot-alias/*/*",
-                                "arn:aws:s3:::*cfz-wad-csgy-9223-photobot-store*/*"
+                                "arn:aws:s3:::*cfy-wad-csgy-9223-photobot-store*/*"
                             ]
                         }
                     ]
@@ -235,7 +225,7 @@ Resources:
         Type: "AWS::IAM::Role"
         Properties:
             Path: "/"
-            RoleName: "cfzMyLexRole"
+            RoleName: "cfyMyLexRole"
             AssumeRolePolicyDocument: "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"lambda.amazonaws.com\"},\"Action\":\"sts:AssumeRole\"},{\"Sid\":\"Statement1\",\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"lexv2.amazonaws.com\"},\"Action\":\"sts:AssumeRole\"}]}"
             MaxSessionDuration: 3600
             Description: "Allows Lex V2 bots to call AWS services on your behalf."
@@ -244,21 +234,20 @@ Resources:
         Type: "AWS::IAM::User"
         Properties:
             Path: "/"
-            UserName: "cfz-transcribe-user"
+            UserName: "cfy-transcribe-user"
             ManagedPolicyArns: 
               - !Ref IAMManagedPolicyTranscribe
 
     IAMManagedPolicyTranscribe:
         Type: "AWS::IAM::ManagedPolicy"
         Properties:
-            ManagedPolicyName: "cfzMyTranscribePolicy"
+            ManagedPolicyName: "cfyMyTranscribePolicy"
             Path: "/"
             PolicyDocument: |
                 {
                     "Version": "2012-10-17",
                     "Statement": [
                         {
-                            "Sid": "VisualEditor0",
                             "Effect": "Allow",
                             "Action": "transcribe:StartStreamTranscriptionWebSocket",
                             "Resource": "*"
