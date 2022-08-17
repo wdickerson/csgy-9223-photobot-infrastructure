@@ -6,7 +6,7 @@ Resources:
     OpenSearchServiceDomain:
         Type: "AWS::OpenSearchService::Domain"
         Properties:
-            DomainName: "cfy-photobot-es"
+            DomainName: "cfx-photobot-es"
             EngineVersion: "OpenSearch_1.3"
             ClusterConfig:
                 InstanceCount: 2
@@ -19,7 +19,7 @@ Resources:
                         Principal:
                             AWS: !GetAtt IAMRoleLambda.Arn
                         Action: "es:*"
-                        Resource: !Sub "arn:aws:es:${AWS::Region}:${AWS::AccountId}:domain/cfy-photobot-es/*"
+                        Resource: !Sub "arn:aws:es:${AWS::Region}:${AWS::AccountId}:domain/cfx-photobot-es/*"
             EBSOptions:
                 EBSEnabled: true
                 VolumeType: "gp3"
@@ -31,7 +31,7 @@ Resources:
     LexBot:
         Type: AWS::Lex::Bot
         Properties:
-            Name: "cfyPhotobot"
+            Name: "cfxPhotobot"
             RoleArn: !GetAtt IAMRoleLex.Arn
             DataPrivacy:
                 ChildDirected: false
@@ -142,7 +142,7 @@ Resources:
         Type: AWS::Lex::BotAlias
         Properties:
             BotId: !Ref LexBot
-            BotAliasName: "cfyPhotobotAlias"
+            BotAliasName: "cfxPhotobotAlias"
             BotAliasLocaleSettings:
               - LocaleId: en_US
                 BotAliasLocaleSetting:
@@ -155,7 +155,7 @@ Resources:
         Type: "AWS::IAM::Role"
         Properties:
             Path: "/"
-            RoleName: "cfyMyApiGatewayRole"
+            RoleName: "cfxMyApiGatewayRole"
             AssumeRolePolicyDocument: "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Sid\":\"\",\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"apigateway.amazonaws.com\"},\"Action\":\"sts:AssumeRole\"}]}"
             MaxSessionDuration: 3600
             ManagedPolicyArns:
@@ -166,7 +166,7 @@ Resources:
     IAMManagedPolicyApiGateway:
         Type: "AWS::IAM::ManagedPolicy"
         Properties:
-            ManagedPolicyName: "cfyMyApiGatewayPolicy"
+            ManagedPolicyName: "cfxMyApiGatewayPolicy"
             Path: "/"
             PolicyDocument: !Sub |
                 {
@@ -175,7 +175,7 @@ Resources:
                         {
                             "Effect": "Allow",
                             "Action": "s3:PutObject",
-                            "Resource": "arn:aws:s3:::*cfy-wad-csgy-9223-photobot-store*/*"
+                            "Resource": "arn:aws:s3:::*cfx-wad-csgy-9223-photobot-store*/*"
                         }
                     ]
                 }
@@ -184,7 +184,7 @@ Resources:
         Type: "AWS::IAM::Role"
         Properties:
             Path: "/"
-            RoleName: "cfyMyLambdaRole"
+            RoleName: "cfxMyLambdaRole"
             AssumeRolePolicyDocument: "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"lambda.amazonaws.com\"},\"Action\":\"sts:AssumeRole\"}]}"
             MaxSessionDuration: 3600
             ManagedPolicyArns:
@@ -195,7 +195,7 @@ Resources:
     IAMManagedPolicyLambda:
         Type: "AWS::IAM::ManagedPolicy"
         Properties:
-            ManagedPolicyName: "cfyMyLambdaPolicy"
+            ManagedPolicyName: "cfxMyLambdaPolicy"
             Path: "/"
             PolicyDocument: !Sub |
                 {
@@ -215,7 +215,7 @@ Resources:
                             ],
                             "Resource": [
                                 "arn:aws:lex:*:${AWS::AccountId}:bot-alias/*/*",
-                                "arn:aws:s3:::*cfy-wad-csgy-9223-photobot-store*/*"
+                                "arn:aws:s3:::*cfx-wad-csgy-9223-photobot-store*/*"
                             ]
                         }
                     ]
@@ -225,38 +225,7 @@ Resources:
         Type: "AWS::IAM::Role"
         Properties:
             Path: "/"
-            RoleName: "cfyMyLexRole"
+            RoleName: "cfxMyLexRole"
             AssumeRolePolicyDocument: "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"lambda.amazonaws.com\"},\"Action\":\"sts:AssumeRole\"},{\"Sid\":\"Statement1\",\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"lexv2.amazonaws.com\"},\"Action\":\"sts:AssumeRole\"}]}"
             MaxSessionDuration: 3600
             Description: "Allows Lex V2 bots to call AWS services on your behalf."
-
-    IAMUserTranscribe:
-        Type: "AWS::IAM::User"
-        Properties:
-            Path: "/"
-            UserName: "cfy-transcribe-user"
-            ManagedPolicyArns: 
-              - !Ref IAMManagedPolicyTranscribe
-
-    IAMManagedPolicyTranscribe:
-        Type: "AWS::IAM::ManagedPolicy"
-        Properties:
-            ManagedPolicyName: "cfyMyTranscribePolicy"
-            Path: "/"
-            PolicyDocument: |
-                {
-                    "Version": "2012-10-17",
-                    "Statement": [
-                        {
-                            "Effect": "Allow",
-                            "Action": "transcribe:StartStreamTranscriptionWebSocket",
-                            "Resource": "*"
-                        }
-                    ]
-                }
-
-    IAMAccessKeyTranscribe:
-        Type: "AWS::IAM::AccessKey"
-        Properties:
-            Status: "Active"
-            UserName: !Ref IAMUserTranscribe
